@@ -1,0 +1,25 @@
+From 86ab9479e07cab6bf4a471d00830f35502528294 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 16 Jan 2016 06:59:23 -0500
+Subject: [PATCH] Allow Configuration objects to be cloned
+
+
+diff --git a/config/src/main/java/net/md_5/bungee/config/Configuration.java b/config/src/main/java/net/md_5/bungee/config/Configuration.java
+index 967a1b2a..78822dc5 100644
+--- a/config/src/main/java/net/md_5/bungee/config/Configuration.java
++++ b/config/src/main/java/net/md_5/bungee/config/Configuration.java
+@@ -25,6 +25,11 @@ public final class Configuration
+         this( new LinkedHashMap<String, Object>(), defaults );
+     }
+ 
++    public Configuration(Configuration values, Configuration defaults)
++    {
++        this( values.self, defaults );
++    }
++
+     Configuration(Map<?, ?> map, Configuration defaults)
+     {
+         this.self = new LinkedHashMap<>();
+-- 
+2.11.0 (Apple Git-81)
+

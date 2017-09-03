@@ -1,0 +1,23 @@
+From fb1feb728d825d8c418ecfbcc019fa2cf0cc11d2 Mon Sep 17 00:00:00 2001
+From: mrapple <tony@oc.tc>
+Date: Thu, 11 Sep 2014 23:33:52 -0500
+Subject: [PATCH] Disable security manager
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index fff71f74..f00e2b2d 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -188,7 +188,8 @@ public class BungeeCord extends ProxyServer
+         // Java uses ! to indicate a resource inside of a jar/zip/other container. Running Bungee from within a directory that has a ! will cause this to muck up.
+         Preconditions.checkState( new File( "." ).getAbsolutePath().indexOf( '!' ) == -1, "Cannot use BungeeCord in directory with ! in path." );
+ 
+-        System.setSecurityManager( new BungeeSecurityManager() );
++        // Overcast - disable security manager
++        // System.setSecurityManager( new BungeeSecurityManager() );
+ 
+         try
+         {
+-- 
+2.11.0 (Apple Git-81)
+

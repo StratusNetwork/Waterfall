@@ -1,0 +1,35 @@
+From b8e10f21105360a3c7fbc0c27c58dfbbc1246988 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 13 Dec 2014 15:16:04 -0500
+Subject: [PATCH] Ignore a common exception that appears to be harmless
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java b/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
+index 71df1fd5..06896209 100644
+--- a/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
++++ b/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
+@@ -17,6 +17,8 @@ import net.md_5.bungee.protocol.PacketWrapper;
+ import net.md_5.bungee.protocol.Protocol;
+ import net.md_5.bungee.protocol.packet.Kick;
+ 
++import java.util.NoSuchElementException;
++
+ public class ChannelWrapper
+ {
+ 
+@@ -134,7 +136,11 @@ public class ChannelWrapper
+     {
+         if ( ch.pipeline().get( PacketCompressor.class ) == null && compressionThreshold != -1 )
+         {
+-            addBefore( PipelineUtils.PACKET_ENCODER, "compress", new PacketCompressor() );
++            try {
++                addBefore(PipelineUtils.PACKET_ENCODER, "compress", new PacketCompressor());
++            } catch(NoSuchElementException ignored) {
++                // Sometimes packet-encoder is not in the pipeline, probably when the client disconnects soon after connecting
++            }
+         }
+         if ( compressionThreshold != -1 )
+         {
+-- 
+2.11.0 (Apple Git-81)
+

@@ -1,0 +1,315 @@
+From 82cae57990d6e187a4d57780bad045b1e7eb927a Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 5 Mar 2016 02:09:59 -0500
+Subject: [PATCH] Add selector and score components to chat API
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java b/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
+index a3b0a2be..bcd53d31 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
++++ b/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
+@@ -3,7 +3,7 @@ package net.md_5.bungee.api;
+ import java.util.EnumSet;
+ import java.util.Set;
+ 
+-public class ChatStringBuilder {
++public class ChatStringBuilder implements Appendable {
+ 
+     private final StringBuilder builder;
+     private ChatColor oldColor, newColor;
+@@ -63,11 +63,29 @@ public class ChatStringBuilder {
+         }
+     }
+ 
+-    public void append(String text) {
+-        if(!text.isEmpty()) {
++    @Override
++    public ChatStringBuilder append(CharSequence text) {
++        if(text.length() != 0) {
+             refreshIfChanged();
+             builder.append(text);
+         }
++        return this;
++    }
++
++    @Override
++    public ChatStringBuilder append(CharSequence text, int start, int end) {
++        if(start < end) {
++            refreshIfChanged();
++            builder.append(text, start, end);
++        }
++        return this;
++    }
++
++    @Override
++    public Appendable append(char c) {
++        refreshIfChanged();
++        builder.append(c);
++        return this;
+     }
+ 
+     public void append(Object thing) {
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java
+new file mode 100644
+index 00000000..0d943ad6
+--- /dev/null
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java
+@@ -0,0 +1,55 @@
++package net.md_5.bungee.api.chat;
++
++import java.util.List;
++import java.util.Set;
++
++import net.md_5.bungee.api.ChatColor;
++import net.md_5.bungee.api.ChatStringBuilder;
++
++import static com.google.common.base.Preconditions.checkNotNull;
++
++public class ScoreComponent extends BaseComponent {
++
++    private final String name, objective;
++
++    public ScoreComponent(String name, String objective) {
++        this.name = checkNotNull(name);
++        this.objective = checkNotNull(objective);
++    }
++
++    public String getName() {
++        return name;
++    }
++
++    public String getObjective() {
++        return objective;
++    }
++
++    @Override
++    public ScoreComponent duplicate() {
++        return new ScoreComponent(getName(), getObjective());
++    }
++
++    private String plainTextContent() {
++        return getName() + ':' + getObjective();
++    }
++
++    @Override
++    void toPlainText(StringBuilder builder) {
++        builder.append(plainTextContent());
++        super.toPlainText(builder);
++    }
++
++    @Override
++    protected void toLegacyTextContent(ChatStringBuilder builder, ChatColor color, Set<ChatColor> decorations) {
++        builder.format(color, decorations);
++        builder.append(plainTextContent());
++    }
++
++    @Override
++    protected void toStringTerminal(List<String> fields) {
++        fields.add("name=\"" + getName() + '"');
++        fields.add("objective=\"" + getObjective() + '"');
++        super.toStringTerminal(fields);
++    }
++}
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java
+new file mode 100644
+index 00000000..53cc35be
+--- /dev/null
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java
+@@ -0,0 +1,45 @@
++package net.md_5.bungee.api.chat;
++
++import java.util.List;
++import java.util.Set;
++
++import net.md_5.bungee.api.ChatColor;
++import net.md_5.bungee.api.ChatStringBuilder;
++
++import static com.google.common.base.Preconditions.checkNotNull;
++
++public class SelectorComponent extends BaseComponent {
++
++    private final String selector;
++
++    public SelectorComponent(String selector) {
++        this.selector = checkNotNull(selector);
++    }
++
++    public String getSelector() {
++        return selector;
++    }
++
++    @Override
++    public SelectorComponent duplicate() {
++        return new SelectorComponent(getSelector());
++    }
++
++    @Override
++    void toPlainText(StringBuilder builder) {
++        builder.append(selector);
++        super.toPlainText(builder);
++    }
++
++    @Override
++    protected void toLegacyTextContent(ChatStringBuilder builder, ChatColor color, Set<ChatColor> decorations) {
++        builder.format(color, decorations);
++        builder.append(getSelector());
++    }
++
++    @Override
++    protected void toStringTerminal(List<String> fields) {
++        fields.add("selector=\"" + getSelector() + '"');
++        super.toStringTerminal(fields);
++    }
++}
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+index 4acb09b7..a3e77766 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+@@ -8,6 +8,8 @@ import com.google.gson.JsonElement;
+ import com.google.gson.JsonObject;
+ import com.google.gson.JsonParseException;
+ import net.md_5.bungee.api.chat.BaseComponent;
++import net.md_5.bungee.api.chat.ScoreComponent;
++import net.md_5.bungee.api.chat.SelectorComponent;
+ import net.md_5.bungee.api.chat.TextComponent;
+ import net.md_5.bungee.api.chat.TranslatableComponent;
+ 
+@@ -21,6 +23,8 @@ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+             registerTypeHierarchyAdapter( BaseComponent.class, new ComponentSerializer() ).
+             registerTypeHierarchyAdapter( TextComponent.class, new TextComponentSerializer() ).
+             registerTypeHierarchyAdapter( TranslatableComponent.class, new TranslatableComponentSerializer() ).
++            registerTypeHierarchyAdapter( SelectorComponent.class, new SelectorComponentSerializer() ).
++            registerTypeHierarchyAdapter( ScoreComponent.class, new ScoreComponentSerializer() ).
+             create();
+ 
+     public final static ThreadLocal<HashSet<BaseComponent>> serializedComponents = new ThreadLocal<HashSet<BaseComponent>>() {
+@@ -63,6 +67,14 @@ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+         {
+             return context.deserialize( json, TranslatableComponent.class );
+         }
++        if ( object.has( "selector" ) )
++        {
++            return context.deserialize( json, SelectorComponent.class );
++        }
++        if ( object.has( "score" ) )
++        {
++            return context.deserialize( json, ScoreComponent.class );
++        }
+         return context.deserialize( json, TextComponent.class );
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/ScoreComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/ScoreComponentSerializer.java
+new file mode 100644
+index 00000000..07f3576d
+--- /dev/null
++++ b/chat/src/main/java/net/md_5/bungee/chat/ScoreComponentSerializer.java
+@@ -0,0 +1,38 @@
++package net.md_5.bungee.chat;
++
++import java.lang.reflect.Type;
++
++import com.google.gson.JsonDeserializationContext;
++import com.google.gson.JsonDeserializer;
++import com.google.gson.JsonElement;
++import com.google.gson.JsonObject;
++import com.google.gson.JsonParseException;
++import com.google.gson.JsonSerializationContext;
++import com.google.gson.JsonSerializer;
++import net.md_5.bungee.api.chat.ScoreComponent;
++
++public class ScoreComponentSerializer extends BaseComponentSerializer implements JsonSerializer<ScoreComponent>, JsonDeserializer<ScoreComponent> {
++
++    @Override
++    public ScoreComponent deserialize(JsonElement jsonElement, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
++        final JsonObject json = jsonElement.getAsJsonObject();
++        final JsonObject score = json.getAsJsonObject("score");
++        final ScoreComponent component = new ScoreComponent(score.get("name").getAsString(),
++                                                            score.get("objective").getAsString());
++        deserialize(json, component, context);
++        return component;
++    }
++
++    @Override
++    public JsonElement serialize(ScoreComponent src, Type typeOfSrc, JsonSerializationContext context) {
++        final JsonObject score = new JsonObject();
++        score.addProperty("name", src.getName());
++        score.addProperty("objective", src.getObjective());
++
++        final JsonObject json = new JsonObject();
++        serialize(json, src, context);
++        json.add("score", score);
++
++        return json;
++    }
++}
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/SelectorComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/SelectorComponentSerializer.java
+new file mode 100644
+index 00000000..c5fbf641
+--- /dev/null
++++ b/chat/src/main/java/net/md_5/bungee/chat/SelectorComponentSerializer.java
+@@ -0,0 +1,31 @@
++package net.md_5.bungee.chat;
++
++import java.lang.reflect.Type;
++
++import com.google.gson.JsonDeserializationContext;
++import com.google.gson.JsonDeserializer;
++import com.google.gson.JsonElement;
++import com.google.gson.JsonObject;
++import com.google.gson.JsonParseException;
++import com.google.gson.JsonSerializationContext;
++import com.google.gson.JsonSerializer;
++import net.md_5.bungee.api.chat.SelectorComponent;
++
++public class SelectorComponentSerializer extends BaseComponentSerializer implements JsonSerializer<SelectorComponent>, JsonDeserializer<SelectorComponent> {
++
++    @Override
++    public SelectorComponent deserialize(JsonElement jsonElement, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
++        final JsonObject json = jsonElement.getAsJsonObject();
++        final SelectorComponent component = new SelectorComponent(json.get("selector").getAsString());
++        deserialize(json, component, context);
++        return component;
++    }
++
++    @Override
++    public JsonElement serialize(SelectorComponent src, Type typeOfSrc, JsonSerializationContext context) {
++        final JsonObject json = new JsonObject();
++        serialize(json, src, context);
++        json.addProperty("selector", src.getSelector());
++        return json;
++    }
++}
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 8ce6c464..ea3afa71 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -55,6 +55,8 @@ import net.md_5.bungee.api.ReconnectHandler;
+ import net.md_5.bungee.api.ServerPing;
+ import net.md_5.bungee.api.Title;
+ import net.md_5.bungee.api.chat.BaseComponent;
++import net.md_5.bungee.api.chat.ScoreComponent;
++import net.md_5.bungee.api.chat.SelectorComponent;
+ import net.md_5.bungee.api.chat.TextComponent;
+ import net.md_5.bungee.api.chat.TranslatableComponent;
+ import net.md_5.bungee.api.config.ConfigurationAdapter;
+@@ -64,6 +66,8 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
+ import net.md_5.bungee.api.plugin.Plugin;
+ import net.md_5.bungee.api.plugin.PluginManager;
+ import net.md_5.bungee.chat.ComponentSerializer;
++import net.md_5.bungee.chat.ScoreComponentSerializer;
++import net.md_5.bungee.chat.SelectorComponentSerializer;
+ import net.md_5.bungee.chat.TextComponentSerializer;
+ import net.md_5.bungee.chat.TranslatableComponentSerializer;
+ import net.md_5.bungee.command.CommandBungee;
+@@ -151,6 +155,8 @@ public class BungeeCord extends ProxyServer
+             .registerTypeAdapter( BaseComponent.class, new ComponentSerializer() )
+             .registerTypeAdapter( TextComponent.class, new TextComponentSerializer() )
+             .registerTypeAdapter( TranslatableComponent.class, new TranslatableComponentSerializer() )
++            .registerTypeAdapter( SelectorComponent.class, new SelectorComponentSerializer() )
++            .registerTypeAdapter( ScoreComponent.class, new ScoreComponentSerializer() )
+             .registerTypeAdapter( ServerPing.PlayerInfo.class, new PlayerInfoSerializer() )
+             .registerTypeAdapter( Favicon.class, Favicon.getFaviconTypeAdapter() ).create();
+     // Travertine start
+-- 
+2.11.0 (Apple Git-81)
+

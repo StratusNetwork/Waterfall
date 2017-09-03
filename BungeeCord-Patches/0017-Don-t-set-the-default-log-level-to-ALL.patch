@@ -1,0 +1,21 @@
+From f5ab05b24dbad27e2648e252a4857b320a0ad58c Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Mon, 31 Aug 2015 03:28:07 -0400
+Subject: [PATCH] Don't set the default log level to ALL
+
+
+diff --git a/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java b/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+index 9598fff3..75e71c4c 100644
+--- a/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
++++ b/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+@@ -23,7 +23,6 @@ public class BungeeLogger extends Logger
+     public BungeeLogger(String loggerName, String filePattern, ConsoleReader reader)
+     {
+         super( loggerName, null );
+-        setLevel( Level.ALL );
+ 
+         try
+         {
+-- 
+2.11.0 (Apple Git-81)
+

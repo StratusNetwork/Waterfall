@@ -1,0 +1,22 @@
+From 74a9f6476d954639668b00de9525d35b55bc9687 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 27 Nov 2014 17:41:15 -0500
+Subject: [PATCH] Log event exceptions at SEVERE level
+
+
+diff --git a/event/src/main/java/net/md_5/bungee/event/EventBus.java b/event/src/main/java/net/md_5/bungee/event/EventBus.java
+index 5b5d4201..080349d2 100644
+--- a/event/src/main/java/net/md_5/bungee/event/EventBus.java
++++ b/event/src/main/java/net/md_5/bungee/event/EventBus.java
+@@ -52,7 +52,7 @@ public class EventBus
+                     throw new Error( "Method rejected target/argument: " + event, ex );
+                 } catch ( InvocationTargetException ex )
+                 {
+-                    logger.log( Level.WARNING, MessageFormat.format( "Error dispatching event {0} to listener {1}", event, method.getListener() ), ex.getCause() );
++                    logger.log( Level.SEVERE, MessageFormat.format( "Error dispatching event {0} to listener {1}", event, method.getListener() ), ex.getCause() );
+                 }
+             }
+         }
+-- 
+2.11.0 (Apple Git-81)
+

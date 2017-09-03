@@ -1,0 +1,63 @@
+From da84c0c86044280aeacebc3c1a1f9d0bf4d7c000 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 11 Oct 2015 04:45:26 -0400
+Subject: [PATCH] Register root logger with LogManager as well
+
+
+diff --git a/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java b/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+index 3647747a..ea042038 100644
+--- a/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
++++ b/log/src/main/java/net/md_5/bungee/log/BungeeLogger.java
+@@ -4,13 +4,22 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+ import java.io.IOException;
+ import java.util.logging.FileHandler;
+ import java.util.logging.Formatter;
+-import java.util.logging.Level;
++import java.util.logging.LogManager;
+ import java.util.logging.LogRecord;
+ import java.util.logging.Logger;
+ import jline.console.ConsoleReader;
+ 
+ public class BungeeLogger extends Logger
+ {
++    public static BungeeLogger get(String loggerName, String filePattern, ConsoleReader reader) {
++        final LogManager lm = LogManager.getLogManager();
++        Logger logger = lm.getLogger(loggerName);
++        if(!(logger instanceof BungeeLogger)) {
++            logger = new BungeeLogger(loggerName, filePattern, reader);
++            lm.addLogger(logger);
++        }
++        return (BungeeLogger) logger;
++    }
+ 
+     private final Formatter formatter = new ConciseFormatter();
+     private final LogDispatcher dispatcher = new LogDispatcher( this );
+@@ -20,9 +29,11 @@ public class BungeeLogger extends Logger
+                 "CallToPrintStackTrace", "CallToThreadStartDuringObjectConstruction"
+             })
+     @SuppressFBWarnings("SC_START_IN_CTOR")
+-    public BungeeLogger(String loggerName, String filePattern, ConsoleReader reader)
++    private BungeeLogger(String loggerName, String filePattern, ConsoleReader reader)
+     {
+         super( loggerName, null );
++        setParent(Logger.getLogger(""));
++        setUseParentHandlers(false);
+ 
+         try
+         {
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 3674f95f..d24ce4b2 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -209,7 +209,7 @@ public class BungeeCord extends ProxyServer
+         consoleReader = new ConsoleReader();
+         consoleReader.setExpandEvents( false );
+ 
+-        logger = new BungeeLogger( "BungeeCord", "proxy.log", consoleReader );
++        logger = BungeeLogger.get( "BungeeCord", "proxy.log", consoleReader );
+ 
+         // Overcast - stderr gets a lot of non-error output, so log it at WARNING level instead of SEVERE
+         System.setErr( new PrintStream( new LoggingOutputStream( logger, Level.WARNING ), true ) );
+-- 
+2.11.0 (Apple Git-81)
+

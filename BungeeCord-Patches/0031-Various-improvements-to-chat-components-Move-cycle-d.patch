@@ -1,0 +1,926 @@
+From 04669f30bb63331f99868a91eadcf15626a8cc10 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 6 Mar 2016 02:33:45 -0500
+Subject: [PATCH] Various improvements to chat components * Move cycle
+ detection to where the cycles are created, which is more robust and easier to
+ debug * Implement equals and hashCode for all components * Make several
+ fields non-null * Don't allow external collections into the extra/with fields
+ * Don't create a resource bundle and regex object for every
+ TranslatableComponent
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+index 510ccbe1..e48cf9b4 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+@@ -1,6 +1,9 @@
+ package net.md_5.bungee.api.chat;
+ 
+ import com.google.common.base.Joiner;
++import com.google.common.base.Objects;
++import com.google.common.base.Preconditions;
++import com.google.common.collect.Lists;
+ import lombok.Getter;
+ import lombok.NoArgsConstructor;
+ import lombok.Setter;
+@@ -11,7 +14,6 @@ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.EnumMap;
+ import java.util.EnumSet;
+-import java.util.HashSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+@@ -20,6 +22,11 @@ import java.util.Set;
+ @NoArgsConstructor
+ public abstract class BaseComponent
+ {
++    /**
++     * An immutable, empty component list. {@link BaseComponent#extra} is always set to this when empty.
++     * Subclasses can use this for their own fields as well.
++     */
++    protected static final List<BaseComponent> EMPTY_COMPONENT_LIST = Collections.emptyList();
+ 
+     /**
+      * The color of this component and any child components (unless overridden)
+@@ -61,7 +68,7 @@ public abstract class BaseComponent
+      * Appended components that inherit this component's formatting and events
+      */
+     @Getter
+-    private List<BaseComponent> extra;
++    private List<BaseComponent> extra = EMPTY_COMPONENT_LIST;
+ 
+     /**
+      * The action to preform when this component (and child components) are
+@@ -87,12 +94,9 @@ public abstract class BaseComponent
+         setInsertion( old.getInsertion() );
+         setClickEvent( old.getClickEvent() );
+         setHoverEvent( old.getHoverEvent() );
+-        if ( old.getExtra() != null )
++        for ( BaseComponent component : old.getExtra() )
+         {
+-            for ( BaseComponent component : old.getExtra() )
+-            {
+-                addExtra( component.duplicate() );
+-            }
++            addValidExtra( component.duplicate() );
+         }
+     }
+ 
+@@ -278,9 +282,30 @@ public abstract class BaseComponent
+         return obfuscated;
+     }
+ 
++    public void setHoverEvent(HoverEvent hoverEvent) {
++        if(hoverEvent != null) {
++            for(BaseComponent child : hoverEvent.getValue()) validateChild(child);
++        }
++        this.hoverEvent = hoverEvent;
++    }
++
+     public void setExtra(List<BaseComponent> components)
+     {
+-        extra = components;
++        if(components == null || components.isEmpty()) {
++            extra = EMPTY_COMPONENT_LIST;
++        } else {
++            for(BaseComponent child : components) validateChild(child);
++            extra = new ArrayList<BaseComponent>(components);
++        }
++    }
++
++    public void setExtra(BaseComponent... components) {
++        if(components == null || components.length == 0) {
++            extra = EMPTY_COMPONENT_LIST;
++        } else {
++            for(BaseComponent child : components) validateChild(child);
++            extra = Lists.newArrayList(components);
++        }
+     }
+ 
+     /**
+@@ -291,7 +316,7 @@ public abstract class BaseComponent
+      */
+     public void addExtra(String text)
+     {
+-        addExtra( new TextComponent( text ) );
++        addValidExtra( new TextComponent( text ) );
+     }
+ 
+     /**
+@@ -299,10 +324,21 @@ public abstract class BaseComponent
+      * component's formatting
+      *
+      * @param component the component to append
++     *                  @throws IllegalArgumentException if a component cycle is detected
+      */
+     public void addExtra(BaseComponent component)
+     {
+-        if ( extra == null )
++        validateChild( component );
++        addValidExtra(component);
++    }
++
++    /**
++     * Append a component without validating it. This method should only be called when
++     * it is certain not to create a component cycle i.e. when the given component is
++     * known not to contain this one.
++     */
++    private void addValidExtra(BaseComponent component) {
++        if (extra == EMPTY_COMPONENT_LIST)
+         {
+             extra = new ArrayList<BaseComponent>();
+         }
+@@ -456,7 +492,58 @@ public abstract class BaseComponent
+         mergeEvents(from);
+     }
+ 
+-    protected void toStringTerminal(List<String> fields) {
++    /**
++     * Verify that the given component can become a part of this component
++     * by checking that they do not already have the inverse relationship.
++     *
++     * This method should be called BEFORE making the given component a child
++     * of this one, so that this component's state remains valid.
++     *
++     * @throws IllegalArgumentException if the given component contains this component
++     */
++    public void validateChild(BaseComponent child) {
++        Preconditions.checkNotNull(child);
++        if(child.contains(this)) {
++            throw new IllegalArgumentException("Component cycle detected between " + this + " and " + child);
++        }
++    }
++
++    /**
++     * Is the given component contained, in whole or in part, by this one?
++     *
++     * This method is used to detect containment cycles. Unlike with collections,
++     * equality is tested with == rather than {@link #equals(Object)}.
++     *
++     * Subclasses with recursive fields of their own should override this method
++     * to include those fields in the search.
++     *
++     * @return true if the given component is the same instance as this component,
++     *         or is a child of this component.
++     */
++    public boolean contains(BaseComponent child) {
++        if(this == child) return true;
++
++        for(BaseComponent extra : getExtra()) {
++            if(extra.contains(child)) return true;
++        }
++
++        if(getHoverEvent() != null) {
++            for(BaseComponent value : getHoverEvent().getValue()) {
++                if(value.contains(child)) return true;
++            }
++        }
++
++        return false;
++    }
++
++    /**
++     * Contribute leading fields to the output of {@link #toString()}.
++     *
++     * These fields should be relatively short i.e. not recursive. They will appear before
++     * any fields contributed by {@link #toStringLast(List)}, which can make the output
++     * easier to read.
++     */
++    protected void toStringFirst(List<String> fields) {
+         if(getColorRaw() != null) {
+             fields.add("color=\"" + getColorRaw().name().toLowerCase() + "\"");
+         }
+@@ -473,7 +560,12 @@ public abstract class BaseComponent
+         }
+     }
+ 
+-    protected void toStringRecursive(List<String> fields) {
++    /**
++     * Contribute trailing fields to the output of {@link #toString()}.
++     *
++     * Particularly long fields, i.e. recursive ones, should be added here.
++     */
++    protected void toStringLast(List<String> fields) {
+         if(getHoverEvent() != null) {
+             fields.add("hoverEvent=" + getHoverEvent());
+         }
+@@ -483,25 +575,53 @@ public abstract class BaseComponent
+         }
+     }
+ 
+-    private static final ThreadLocal<Set<BaseComponent>> visited = new ThreadLocal<Set<BaseComponent>>() {
+-        @Override protected Set<BaseComponent> initialValue() {
+-            return new HashSet<BaseComponent>();
+-        }
+-    };
+-
++    /**
++     * Delegates to {@link #toStringFirst(List)} and {@link #toStringLast(List)}.
++     */
+     @Override
+-    public String toString() {
+-        List<String> fields = new ArrayList<String>();
+-        toStringTerminal(fields);
+-        try {
+-            if(visited.get().add(this)) {
+-                toStringRecursive(fields);
+-            } else {
+-                fields.add("... (cycle)");
+-            }
+-        } finally {
+-            visited.get().remove(this);
+-        }
++    public final String toString() {
++        final List<String> fields = new ArrayList<String>();
++        toStringFirst(fields);
++        toStringLast(fields);
+         return getClass().getSimpleName() + "{" + JOINER.join(fields) + "}";
+     }
++
++    /**
++     * {@link #equals(Object)} delegates to this method when its argument is a {@link BaseComponent},
++     * and is not null or this.
++     *
++     * Overrides of this method must call the supermethod in order to compare the base properties.
++     * This should be done after performing any quick comparisons, and before any expensive ones,
++     * as the base method contains both.
++     */
++    protected boolean equals(BaseComponent that) {
++        return Objects.equal(this.color, that.color) &&
++               Objects.equal(this.bold, that.bold) &&
++               Objects.equal(this.italic, that.italic) &&
++               Objects.equal(this.underlined, that.underlined) &&
++               Objects.equal(this.strikethrough, that.strikethrough) &&
++               Objects.equal(this.obfuscated, that.obfuscated) &&
++               Objects.equal(this.insertion, that.insertion) &&
++               Objects.equal(this.clickEvent, that.clickEvent) &&
++               Objects.equal(this.hoverEvent, that.hoverEvent) &&
++               Objects.equal(this.extra, that.extra);
++    }
++
++    /**
++     * Delegates to {@link #equals(BaseComponent)}.
++     */
++    @Override
++    public final boolean equals(Object that) {
++        return that != null && (
++            that == this || (
++                that instanceof BaseComponent &&
++                equals((BaseComponent) that)
++            )
++        );
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hashCode(color, bold, italic, underlined, strikethrough, obfuscated, insertion, clickEvent, hoverEvent, extra);
++    }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/ClickEvent.java b/chat/src/main/java/net/md_5/bungee/api/chat/ClickEvent.java
+index 1ced284f..4ab9f7a3 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/ClickEvent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/ClickEvent.java
+@@ -1,5 +1,6 @@
+ package net.md_5.bungee.api.chat;
+ 
++import lombok.EqualsAndHashCode;
+ import lombok.Getter;
+ import lombok.RequiredArgsConstructor;
+ import lombok.ToString;
+@@ -8,6 +9,7 @@ import net.md_5.bungee.api.chat.ClickEvent.Action;
+ @Getter
+ @ToString
+ @RequiredArgsConstructor
++@EqualsAndHashCode
+ public final class ClickEvent
+ {
+ 
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/HoverEvent.java b/chat/src/main/java/net/md_5/bungee/api/chat/HoverEvent.java
+index 1b76956a..06d0d8dd 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/HoverEvent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/HoverEvent.java
+@@ -1,5 +1,6 @@
+ package net.md_5.bungee.api.chat;
+ 
++import lombok.EqualsAndHashCode;
+ import lombok.Getter;
+ import lombok.RequiredArgsConstructor;
+ import lombok.ToString;
+@@ -7,6 +8,7 @@ import lombok.ToString;
+ @Getter
+ @ToString
+ @RequiredArgsConstructor
++@EqualsAndHashCode
+ final public class HoverEvent
+ {
+ 
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java
+index 0d943ad6..f0e9e983 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/ScoreComponent.java
+@@ -3,27 +3,19 @@ package net.md_5.bungee.api.chat;
+ import java.util.List;
+ import java.util.Set;
+ 
++import com.google.common.base.Objects;
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NonNull;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.ChatStringBuilder;
+ 
+-import static com.google.common.base.Preconditions.checkNotNull;
+-
++@Getter
++@AllArgsConstructor
+ public class ScoreComponent extends BaseComponent {
+ 
+-    private final String name, objective;
+-
+-    public ScoreComponent(String name, String objective) {
+-        this.name = checkNotNull(name);
+-        this.objective = checkNotNull(objective);
+-    }
+-
+-    public String getName() {
+-        return name;
+-    }
+-
+-    public String getObjective() {
+-        return objective;
+-    }
++    @NonNull private final String name;
++    @NonNull private final String objective;
+ 
+     @Override
+     public ScoreComponent duplicate() {
+@@ -47,9 +39,22 @@ public class ScoreComponent extends BaseComponent {
+     }
+ 
+     @Override
+-    protected void toStringTerminal(List<String> fields) {
++    protected void toStringFirst(List<String> fields) {
+         fields.add("name=\"" + getName() + '"');
+         fields.add("objective=\"" + getObjective() + '"');
+-        super.toStringTerminal(fields);
++        super.toStringFirst(fields);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hashCode(super.hashCode(), name, objective);
++    }
++
++    @Override
++    protected boolean equals(BaseComponent that) {
++        return that instanceof ScoreComponent &&
++               name.equals(((ScoreComponent) that).getName()) &&
++               objective.equals(((ScoreComponent) that).getObjective()) &&
++               super.equals(that);
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java
+index 53cc35be..6f35b3e1 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/SelectorComponent.java
+@@ -3,22 +3,18 @@ package net.md_5.bungee.api.chat;
+ import java.util.List;
+ import java.util.Set;
+ 
++import com.google.common.base.Objects;
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NonNull;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.ChatStringBuilder;
+ 
+-import static com.google.common.base.Preconditions.checkNotNull;
+-
++@Getter
++@AllArgsConstructor
+ public class SelectorComponent extends BaseComponent {
+ 
+-    private final String selector;
+-
+-    public SelectorComponent(String selector) {
+-        this.selector = checkNotNull(selector);
+-    }
+-
+-    public String getSelector() {
+-        return selector;
+-    }
++    @NonNull private final String selector;
+ 
+     @Override
+     public SelectorComponent duplicate() {
+@@ -38,8 +34,20 @@ public class SelectorComponent extends BaseComponent {
+     }
+ 
+     @Override
+-    protected void toStringTerminal(List<String> fields) {
++    protected void toStringFirst(List<String> fields) {
+         fields.add("selector=\"" + getSelector() + '"');
+-        super.toStringTerminal(fields);
++        super.toStringFirst(fields);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hashCode(super.hashCode(), selector);
++    }
++
++    @Override
++    protected boolean equals(BaseComponent that) {
++        return that instanceof SelectorComponent &&
++               selector.equals(((SelectorComponent) that).getSelector()) &&
++               super.equals(that);
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+index 34722373..2609b00e 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+@@ -1,14 +1,14 @@
+ package net.md_5.bungee.api.chat;
+ 
++import com.google.common.base.Objects;
+ import lombok.AllArgsConstructor;
+ import lombok.Getter;
+-import lombok.NoArgsConstructor;
++import lombok.NonNull;
+ import lombok.Setter;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.ChatStringBuilder;
+ 
+ import java.util.ArrayList;
+-import java.util.Arrays;
+ import java.util.List;
+ import java.util.Set;
+ import java.util.regex.Matcher;
+@@ -135,14 +135,13 @@ public class TextComponent extends BaseComponent
+     /**
+      * The text of the component that will be displayed to the client
+      */
+-    private String text;
++    @NonNull private String text;
+ 
+     /**
+-     * Creates a TextComponent with blank text.
++     * Creates a blank component
+      */
+-    public TextComponent()
+-    {
+-        this.text = "";
++    public TextComponent() {
++        this("");
+     }
+ 
+     /**
+@@ -166,7 +165,7 @@ public class TextComponent extends BaseComponent
+     public TextComponent(BaseComponent... extras)
+     {
+         setText( "" );
+-        setExtra( new ArrayList<BaseComponent>( Arrays.asList( extras ) ) );
++        setExtra( extras );
+     }
+ 
+     /**
+@@ -194,8 +193,20 @@ public class TextComponent extends BaseComponent
+         builder.append( text );
+     }
+ 
+-    @Override protected void toStringTerminal(List<String> fields) {
++    @Override protected void toStringFirst(List<String> fields) {
+         fields.add("text=\"" + getText() + "\"");
+-        super.toStringTerminal(fields);
++        super.toStringFirst(fields);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hashCode(super.hashCode(), text);
++    }
++
++    @Override
++    protected boolean equals(BaseComponent that) {
++        return that instanceof TextComponent &&
++               text.equals(((TextComponent) that).getText()) &&
++               super.equals(that);
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+index a828b649..34d2ed16 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+@@ -1,10 +1,13 @@
+ package net.md_5.bungee.api.chat;
+ 
++import com.google.common.base.Objects;
++import com.google.common.collect.Lists;
+ import lombok.Getter;
+-import lombok.NoArgsConstructor;
++import lombok.NonNull;
+ import lombok.Setter;
+ 
+ import java.util.ArrayList;
++import java.util.Arrays;
+ import java.util.List;
+ import java.util.MissingResourceException;
+ import java.util.ResourceBundle;
+@@ -17,22 +20,22 @@ import net.md_5.bungee.api.ChatStringBuilder;
+ 
+ @Getter
+ @Setter
+-@NoArgsConstructor
+ public class TranslatableComponent extends BaseComponent
+ {
+ 
+-    private final ResourceBundle locales = ResourceBundle.getBundle( "mojang-translations/en_US" );
+-    private final Pattern format = Pattern.compile( "%(?:(\\d+)\\$)?([A-Za-z%]|$)" );
++    private static final ResourceBundle locales = ResourceBundle.getBundle( "mojang-translations/en_US" );
++    private static final Pattern format = Pattern.compile( "%(?:(\\d+)\\$)?([A-Za-z%]|$)" );
+ 
+     /**
+      * The key into the Minecraft locale files to use for the translation. The
+      * text depends on the client's locale setting. The console is always en_US
+      */
+-    private String translate;
++    @NonNull private String translate;
++
+     /**
+      * The components to substitute into the translation
+      */
+-    private List<BaseComponent> with;
++    private List<BaseComponent> with = EMPTY_COMPONENT_LIST;
+ 
+     /**
+      * Creates a translatable component from the original to clone it.
+@@ -51,7 +54,7 @@ public class TranslatableComponent extends BaseComponent
+             {
+                 temp.add( baseComponent.duplicate() );
+             }
+-            setWith( temp );
++            setWithInternal( temp );
+         }
+     }
+ 
+@@ -79,7 +82,7 @@ public class TranslatableComponent extends BaseComponent
+                 temp.add( (BaseComponent) w );
+             }
+         }
+-        setWith( temp );
++        setWithInternal( temp );
+     }
+ 
+     /**
+@@ -101,7 +104,27 @@ public class TranslatableComponent extends BaseComponent
+      */
+     public void setWith(List<BaseComponent> components)
+     {
+-        with = components;
++        if(components == null) {
++            setWithInternal(null);
++        } else {
++            for(BaseComponent child : components) validateChild(child);
++            setWithInternal(new ArrayList<BaseComponent>(components));
++        }
++    }
++
++    /**
++     * Sets the translation substitutions to be used in this component. Removes
++     * any previously set substitutions
++     *
++     * @param components the components to substitute
++     */
++    public void setWith(BaseComponent... components)
++    {
++        setWith(components == null ? EMPTY_COMPONENT_LIST : Arrays.asList(components));
++    }
++
++    private void setWithInternal(List<BaseComponent> components) {
++        with = components == null || components.isEmpty() ? EMPTY_COMPONENT_LIST : components;
+     }
+ 
+     /**
+@@ -123,7 +146,8 @@ public class TranslatableComponent extends BaseComponent
+      */
+     public void addWith(BaseComponent component)
+     {
+-        if ( with == null )
++        validateChild(component);
++        if ( with == EMPTY_COMPONENT_LIST )
+         {
+             with = new ArrayList<BaseComponent>();
+         }
+@@ -222,16 +246,38 @@ public class TranslatableComponent extends BaseComponent
+     }
+ 
+     @Override
+-    protected void toStringTerminal(List<String> fields) {
++    public boolean contains(BaseComponent child) {
++        if(super.contains(child)) return true;
++        for(BaseComponent with : getWith()) {
++            if(with.contains(child)) return true;
++        }
++        return false;
++    }
++
++    @Override
++    protected void toStringFirst(List<String> fields) {
+         fields.add("translate=\"" + getTranslate() + "\"");
+-        super.toStringTerminal(fields);
++        super.toStringFirst(fields);
+     }
+ 
+     @Override
+-    protected void toStringRecursive(List<String> fields) {
++    protected void toStringLast(List<String> fields) {
+         if(getWith() != null && !getWith().isEmpty()) {
+             fields.add("with=[" + JOINER.join(getWith()) + "]");
+         }
+-        super.toStringRecursive(fields);
++        super.toStringLast(fields);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hashCode(super.hashCode(), translate, with);
++    }
++
++    @Override
++    protected boolean equals(BaseComponent that) {
++        return that instanceof TranslatableComponent &&
++               translate.equals(((TranslatableComponent) that).getTranslate()) &&
++               super.equals(that) &&
++               with.equals(((TranslatableComponent) that).getWith());
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
+index 77f678ed..28449015 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
+@@ -1,6 +1,5 @@
+ package net.md_5.bungee.chat;
+ 
+-import com.google.common.base.Preconditions;
+ import com.google.gson.JsonDeserializationContext;
+ import com.google.gson.JsonObject;
+ import com.google.gson.JsonSerializationContext;
+@@ -77,61 +76,54 @@ public class BaseComponentSerializer
+ 
+     protected void serialize(JsonObject object, BaseComponent component, JsonSerializationContext context)
+     {
+-        try
++        if ( component.getColorRaw() != null )
+         {
+-            Preconditions.checkArgument( ComponentSerializer.serializedComponents.get().add( component ), "Component loop: " + component );
+-            if ( component.getColorRaw() != null )
+-            {
+-                object.addProperty( "color", component.getColorRaw().getName() );
+-            }
+-            if ( component.isBoldRaw() != null )
+-            {
+-                object.addProperty( "bold", component.isBoldRaw() );
+-            }
+-            if ( component.isItalicRaw() != null )
+-            {
+-                object.addProperty( "italic", component.isItalicRaw() );
+-            }
+-            if ( component.isUnderlinedRaw() != null )
+-            {
+-                object.addProperty( "underlined", component.isUnderlinedRaw() );
+-            }
+-            if ( component.isStrikethroughRaw() != null )
+-            {
+-                object.addProperty( "strikethrough", component.isStrikethroughRaw() );
+-            }
+-            if ( component.isObfuscatedRaw() != null )
+-            {
+-                object.addProperty( "obfuscated", component.isObfuscatedRaw() );
+-            }
+-            if ( component.getInsertion() != null )
+-            {
+-                object.addProperty( "insertion", component.getInsertion() );
+-            }
++            object.addProperty( "color", component.getColorRaw().getName() );
++        }
++        if ( component.isBoldRaw() != null )
++        {
++            object.addProperty( "bold", component.isBoldRaw() );
++        }
++        if ( component.isItalicRaw() != null )
++        {
++            object.addProperty( "italic", component.isItalicRaw() );
++        }
++        if ( component.isUnderlinedRaw() != null )
++        {
++            object.addProperty( "underlined", component.isUnderlinedRaw() );
++        }
++        if ( component.isStrikethroughRaw() != null )
++        {
++            object.addProperty( "strikethrough", component.isStrikethroughRaw() );
++        }
++        if ( component.isObfuscatedRaw() != null )
++        {
++            object.addProperty( "obfuscated", component.isObfuscatedRaw() );
++        }
++        if ( component.getInsertion() != null )
++        {
++            object.addProperty( "insertion", component.getInsertion() );
++        }
+ 
+-            if ( component.getExtra() != null )
+-            {
+-                object.add( "extra", context.serialize( component.getExtra() ) );
+-            }
++        if ( component.getExtra() != null && !component.getExtra().isEmpty() )
++        {
++            object.add( "extra", context.serialize( component.getExtra() ) );
++        }
+ 
+-            //Events
+-            if ( component.getClickEvent() != null )
+-            {
+-                JsonObject clickEvent = new JsonObject();
+-                clickEvent.addProperty( "action", component.getClickEvent().getAction().toString().toLowerCase() );
+-                clickEvent.addProperty( "value", component.getClickEvent().getValue() );
+-                object.add( "clickEvent", clickEvent );
+-            }
+-            if ( component.getHoverEvent() != null )
+-            {
+-                JsonObject hoverEvent = new JsonObject();
+-                hoverEvent.addProperty( "action", component.getHoverEvent().getAction().toString().toLowerCase() );
+-                hoverEvent.add( "value", context.serialize( component.getHoverEvent().getValue() ) );
+-                object.add( "hoverEvent", hoverEvent );
+-            }
+-        } finally
++        //Events
++        if ( component.getClickEvent() != null )
++        {
++            JsonObject clickEvent = new JsonObject();
++            clickEvent.addProperty( "action", component.getClickEvent().getAction().toString().toLowerCase() );
++            clickEvent.addProperty( "value", component.getClickEvent().getValue() );
++            object.add( "clickEvent", clickEvent );
++        }
++        if ( component.getHoverEvent() != null )
+         {
+-            ComponentSerializer.serializedComponents.get().remove( component );
++            JsonObject hoverEvent = new JsonObject();
++            hoverEvent.addProperty( "action", component.getHoverEvent().getAction().toString().toLowerCase() );
++            hoverEvent.add( "value", context.serialize( component.getHoverEvent().getValue() ) );
++            object.add( "hoverEvent", hoverEvent );
+         }
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+index a3e77766..b9d795d2 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+@@ -14,7 +14,6 @@ import net.md_5.bungee.api.chat.TextComponent;
+ import net.md_5.bungee.api.chat.TranslatableComponent;
+ 
+ import java.lang.reflect.Type;
+-import java.util.HashSet;
+ 
+ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+ {
+@@ -27,12 +26,6 @@ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+             registerTypeHierarchyAdapter( ScoreComponent.class, new ScoreComponentSerializer() ).
+             create();
+ 
+-    public final static ThreadLocal<HashSet<BaseComponent>> serializedComponents = new ThreadLocal<HashSet<BaseComponent>>() {
+-        @Override protected HashSet<BaseComponent> initialValue() {
+-            return new HashSet<BaseComponent>();
+-        }
+-    };
+-
+     public static BaseComponent[] parse(String json)
+     {
+         if ( json.startsWith( "[" ) )
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
+index 213fb574..a6019d62 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
+@@ -19,10 +19,9 @@ public class TranslatableComponentSerializer extends BaseComponentSerializer imp
+     @Override
+     public TranslatableComponent deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException
+     {
+-        TranslatableComponent component = new TranslatableComponent();
+         JsonObject object = json.getAsJsonObject();
++        TranslatableComponent component = new TranslatableComponent(object.get( "translate" ).getAsString());
+         deserialize( object, component, context );
+-        component.setTranslate( object.get( "translate" ).getAsString() );
+         if ( object.has( "with" ) )
+         {
+             component.setWith( Arrays.asList( (BaseComponent[]) context.deserialize( object.get( "with" ), BaseComponent[].class ) ) );
+@@ -38,13 +37,7 @@ public class TranslatableComponentSerializer extends BaseComponentSerializer imp
+         object.addProperty( "translate", src.getTranslate() );
+         if ( src.getWith() != null )
+         {
+-            try {
+-                ComponentSerializer.serializedComponents.get().add( src );
+-                object.add( "with", context.serialize( src.getWith() ) );
+-            }
+-            finally {
+-                ComponentSerializer.serializedComponents.get().remove( src );
+-            }
++            object.add( "with", context.serialize( src.getWith() ) );
+         }
+         return object;
+     }
+diff --git a/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java b/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
+index f696d014..d7a4f62a 100644
+--- a/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
++++ b/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
+@@ -1,5 +1,6 @@
+ package net.md_5.bungee.chat;
+ 
++import com.google.common.collect.ImmutableList;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.chat.BaseComponent;
+ import net.md_5.bungee.api.chat.ClickEvent;
+@@ -140,50 +141,58 @@ public class ComponentsTest
+         Assert.assertEquals( eventRetention[1].getClickEvent(), testClickEvent );
+     }
+ 
+-    @Test(expected = IllegalArgumentException.class)
++    @Test
+     public void testLoopSimple()
+     {
+         TextComponent component = new TextComponent( "Testing" );
+-        component.addExtra( component );
+-        ComponentSerializer.toString( component );
++
++        try {
++            component.addExtra( component );
++            Assert.fail();
++        } catch(IllegalArgumentException ignored) {}
++
++        try {
++            component.setExtra( component );
++            Assert.fail();
++        } catch(IllegalArgumentException ignored) {}
++
++        try {
++            component.setExtra(ImmutableList.<BaseComponent>of(component));
++            Assert.fail();
++        } catch(IllegalArgumentException ignored) {}
+     }
+ 
+-    @Test(expected = IllegalArgumentException.class)
++    @Test
+     public void testLoopComplex()
+     {
+         TextComponent a = new TextComponent( "A" );
+         TextComponent b = new TextComponent( "B" );
+-        b.setColor( ChatColor.AQUA );
+         TextComponent c = new TextComponent( "C" );
+-        c.setColor( ChatColor.RED );
+         a.addExtra( b );
+         b.addExtra( c );
+-        c.addExtra( a );
+-        ComponentSerializer.toString( a );
++
++        try {
++            c.addExtra( a );
++            Assert.fail();
++        } catch(IllegalArgumentException ignored) {}
+     }
+ 
+     @Test
+-    public void testRepeated()
+-    {
+-        TextComponent a = new TextComponent( "A" );
+-        TextComponent b = new TextComponent( "B" );
+-        b.setColor( ChatColor.AQUA );
+-        a.addExtra( b );
+-        a.addExtra( b );
+-        ComponentSerializer.toString( a );
++    public void testLoopInTranslatable() {
++        TranslatableComponent c = new TranslatableComponent("hi");
++        try {
++            c.addWith(c);
++            Assert.fail();
++        } catch(IllegalArgumentException ignored) {}
+     }
+ 
+-    @Test(expected = IllegalArgumentException.class)
+-    public void testRepeatedError()
++    @Test
++    public void testRepeated()
+     {
+         TextComponent a = new TextComponent( "A" );
+         TextComponent b = new TextComponent( "B" );
+         b.setColor( ChatColor.AQUA );
+-        TextComponent c = new TextComponent( "C" );
+-        c.setColor( ChatColor.RED );
+         a.addExtra( b );
+-        a.addExtra( c );
+-        c.addExtra( a );
+         a.addExtra( b );
+         ComponentSerializer.toString( a );
+     }
+-- 
+2.11.0 (Apple Git-81)
+

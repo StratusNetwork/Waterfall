@@ -1,0 +1,80 @@
+From 50ba0ba46d8c6d6f950d1a2e8478de1d88d78eb3 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 26 Jun 2016 21:28:53 -0400
+Subject: [PATCH] Implement minecraft-api strict config getters
+
+
+diff --git a/config/src/main/java/net/md_5/bungee/config/Configuration.java b/config/src/main/java/net/md_5/bungee/config/Configuration.java
+index a36cc0f4..38e2d6a1 100644
+--- a/config/src/main/java/net/md_5/bungee/config/Configuration.java
++++ b/config/src/main/java/net/md_5/bungee/config/Configuration.java
+@@ -1,5 +1,6 @@
+ package net.md_5.bungee.config;
+ 
++import com.google.common.collect.ImmutableMap;
+ import com.google.common.collect.Sets;
+ import java.util.ArrayList;
+ import java.util.Collection;
+@@ -8,11 +9,14 @@ import java.util.LinkedHashMap;
+ import java.util.List;
+ import java.util.Map;
+ import lombok.Getter;
++import tc.oc.minecraft.api.configuration.AbstractConfigurationSection;
++import tc.oc.minecraft.api.configuration.InvalidConfigurationException;
+ 
+-public final class Configuration implements tc.oc.minecraft.api.configuration.Configuration
++public final class Configuration extends AbstractConfigurationSection implements tc.oc.minecraft.api.configuration.Configuration
+ {
+ 
+     private static final char SEPARATOR = '.';
++    final String absolutePath;
+     final Map<String, Object> self;
+     @Getter
+     private final Configuration defaults;
+@@ -34,6 +38,12 @@ public final class Configuration implements tc.oc.minecraft.api.configuration.Co
+ 
+     Configuration(Map<?, ?> map, Configuration defaults)
+     {
++        this("", map, defaults);
++    }
++
++    Configuration(String absolutePath, Map<?, ?> map, Configuration defaults)
++    {
++        this.absolutePath = absolutePath;
+         this.self = new LinkedHashMap<>();
+         this.defaults = defaults;
+ 
+@@ -63,7 +73,7 @@ public final class Configuration implements tc.oc.minecraft.api.configuration.Co
+         Object section = self.get( root );
+         if ( section == null )
+         {
+-            section = new Configuration( ( defaults == null ) ? null : defaults.getSection( path ) );
++            section = new Configuration( resolvePath(path), ImmutableMap.of(), (defaults == null ) ? null : defaults.getSection(path ) );
+             self.put( root, section );
+         }
+ 
+@@ -143,6 +153,11 @@ public final class Configuration implements tc.oc.minecraft.api.configuration.Co
+         return (Configuration) get( path, ( def instanceof Configuration ) ? def : new Configuration( ( defaults == null ) ? null : defaults.getSection( path ) ) );
+     }
+ 
++    @Override
++    public Configuration needSection(String path) throws InvalidConfigurationException {
++        return needType(path, Configuration.class);
++    }
++
+     /**
+      * Gets keys, not deep by default.
+      *
+@@ -418,4 +433,9 @@ public final class Configuration implements tc.oc.minecraft.api.configuration.Co
+         Object val = get( path, def );
+         return ( val instanceof List<?> ) ? (List<?>) val : def;
+     }
++
++    @Override
++    public String getCurrentPath() {
++        return absolutePath;
++    }
+ }
+-- 
+2.11.0 (Apple Git-81)
+

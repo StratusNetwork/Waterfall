@@ -1,0 +1,24 @@
+From 357e7e738f494d011ee988407a11cfc6842cf98f Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 14 Dec 2014 02:58:43 -0500
+Subject: [PATCH] Fix NPE caused by the other fix
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java b/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
+index 06896209..ddab294e 100644
+--- a/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
++++ b/proxy/src/main/java/net/md_5/bungee/netty/ChannelWrapper.java
+@@ -138,8 +138,9 @@ public class ChannelWrapper
+         {
+             try {
+                 addBefore(PipelineUtils.PACKET_ENCODER, "compress", new PacketCompressor());
+-            } catch(NoSuchElementException ignored) {
++            } catch(NoSuchElementException ex) {
+                 // Sometimes packet-encoder is not in the pipeline, probably when the client disconnects soon after connecting
++                return;
+             }
+         }
+         if ( compressionThreshold != -1 )
+-- 
+2.11.0 (Apple Git-81)
+

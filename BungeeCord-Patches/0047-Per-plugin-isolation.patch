@@ -1,0 +1,44 @@
+From 03ab4c045a6423f8078ca450977275d7bdc9041a Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 28 Jan 2017 16:19:13 -0500
+Subject: [PATCH] Per-plugin isolation
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginDescription.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginDescription.java
+index 2568203b..775fc4fb 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/PluginDescription.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginDescription.java
+@@ -53,6 +53,8 @@ public class PluginDescription implements tc.oc.minecraft.api.plugin.PluginDescr
+      */
+     private String description = null;
+ 
++    private boolean isolate = true;
++
+     @Override
+     public List<String> getAuthors()
+     {
+@@ -70,4 +72,9 @@ public class PluginDescription implements tc.oc.minecraft.api.plugin.PluginDescr
+     {
+         return ImmutableList.copyOf( getSoftDepends() );
+     }
++
++    @Override
++    public boolean isIsolated() {
++        return isolate;
++    }
+ }
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+index 98b5c662..10b41442 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+@@ -435,6 +435,7 @@ public class PluginManager implements PluginFinder
+                         PluginDescription desc = yaml.loadAs( in, PluginDescription.class );
+                         Preconditions.checkNotNull( desc.getName(), "Plugin from %s has no name", file );
+                         Preconditions.checkNotNull( desc.getMain(), "Plugin from %s has no main", file );
++                        Preconditions.checkArgument( desc.isIsolated(), "isolate=false is not supported in " + file + "/plugin.yml" );
+ 
+                         desc.setFile( file );
+                         toLoad.put( desc.getName(), desc );
+-- 
+2.11.0 (Apple Git-81)
+

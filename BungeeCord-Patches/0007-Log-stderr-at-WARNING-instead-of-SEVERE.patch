@@ -1,0 +1,24 @@
+From 23d438d0c71a4c6584eea74a2984306c5371f5ae Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Wed, 19 Nov 2014 04:07:51 -0500
+Subject: [PATCH] Log stderr at WARNING instead of SEVERE
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index f00e2b2d..1c35ec58 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -222,7 +222,9 @@ public class BungeeCord extends ProxyServer
+         consoleReader.setExpandEvents( false );
+ 
+         logger = new BungeeLogger( "BungeeCord", "proxy.log", consoleReader );
+-        System.setErr( new PrintStream( new LoggingOutputStream( logger, Level.SEVERE ), true ) );
++
++        // Overcast - stderr gets a lot of non-error output, so log it at WARNING level instead of SEVERE
++        System.setErr( new PrintStream( new LoggingOutputStream( logger, Level.WARNING ), true ) );
+         System.setOut( new PrintStream( new LoggingOutputStream( logger, Level.INFO ), true ) );
+ 
+         if ( !Boolean.getBoolean( "net.md_5.bungee.native.disable" ) )
+-- 
+2.11.0 (Apple Git-81)
+

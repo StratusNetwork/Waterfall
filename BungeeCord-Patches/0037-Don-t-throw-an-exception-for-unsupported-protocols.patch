@@ -1,0 +1,22 @@
+From e36381a7fa4d424b6d4d7233fede423636637c72 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Wed, 8 Jun 2016 23:40:31 -0400
+Subject: [PATCH] Don't throw an exception for unsupported protocols
+
+
+diff --git a/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java b/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
+index 1a529c04..8ffccb85 100644
+--- a/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
++++ b/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
+@@ -359,7 +359,7 @@ public enum Protocol
+             ProtocolData protocolData = getProtocolData( version );
+             if (protocolData == null)
+             {
+-                throw new BadPacketException( "Unsupported protocol version" );
++                return null; // Unsupported protocol version
+             }
+             if ( id < 0 || id > MAX_PACKET_ID )
+             {
+-- 
+2.11.0 (Apple Git-81)
+

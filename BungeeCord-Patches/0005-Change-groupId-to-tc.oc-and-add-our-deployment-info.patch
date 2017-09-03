@@ -1,0 +1,587 @@
+From 82c9f8514a18c85c71369db470b011a4a8389b1b Mon Sep 17 00:00:00 2001
+From: mrapple <tony@oc.tc>
+Date: Sat, 6 Sep 2014 19:38:31 -0500
+Subject: [PATCH] Change groupId to tc.oc and add our deployment info
+
+
+diff --git a/api/pom.xml b/api/pom.xml
+index 96a46738..92746755 100644
+--- a/api/pom.xml
++++ b/api/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-api</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -20,25 +19,30 @@
+ 
+     <dependencies>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
++            <artifactId>minecraft-api</artifactId>
++            <version>1.11-SNAPSHOT</version>
++        </dependency>
++        <dependency>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-chat</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-config</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-event</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-protocol</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+diff --git a/bootstrap/pom.xml b/bootstrap/pom.xml
+index 9b5c98f7..3a9f2945 100644
+--- a/bootstrap/pom.xml
++++ b/bootstrap/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-bootstrap</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -27,7 +26,7 @@
+ 
+     <dependencies>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-proxy</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+diff --git a/chat/pom.xml b/chat/pom.xml
+index 970e3097..9e570e5b 100644
+--- a/chat/pom.xml
++++ b/chat/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-chat</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -30,5 +29,10 @@
+             <version>2.8.0</version>
+             <scope>compile</scope>
+         </dependency>
++        <dependency>
++            <groupId>com.google.code.findbugs</groupId>
++            <artifactId>jsr305</artifactId>
++            <version>2.0.1</version>
++        </dependency>
+     </dependencies>
+ </project>
+diff --git a/config/pom.xml b/config/pom.xml
+index 253bfdff..a34b92ba 100644
+--- a/config/pom.xml
++++ b/config/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-config</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -20,6 +19,12 @@
+ 
+     <dependencies>
+         <dependency>
++            <groupId>tc.oc</groupId>
++            <artifactId>minecraft-api</artifactId>
++            <version>1.11-SNAPSHOT</version>
++            <scope>compile</scope>
++        </dependency>
++        <dependency>
+             <groupId>org.yaml</groupId>
+             <artifactId>snakeyaml</artifactId>
+             <version>1.18</version>
+diff --git a/event/pom.xml b/event/pom.xml
+index 6132e8e9..250b777d 100644
+--- a/event/pom.xml
++++ b/event/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-event</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/log/pom.xml b/log/pom.xml
+index 2fcbbad6..e008b1ec 100644
+--- a/log/pom.xml
++++ b/log/pom.xml
+@@ -4,13 +4,13 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
++    <groupId>tc.oc</groupId>
+     <artifactId>bungeecord-log</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -26,10 +26,20 @@
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-chat</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
++        <dependency>
++            <groupId>tc.oc</groupId>
++            <artifactId>api-minecraft</artifactId>
++            <version>1.12-SNAPSHOT</version>
++        </dependency>
++        <dependency>
++            <groupId>tc.oc</groupId>
++            <artifactId>api-minecraft</artifactId>
++            <version>1.12-SNAPSHOT</version>
++        </dependency>
+     </dependencies>
+ </project>
+diff --git a/module/cmd-alert/pom.xml b/module/cmd-alert/pom.xml
+index 220f0421..66ff6571 100644
+--- a/module/cmd-alert/pom.xml
++++ b/module/cmd-alert/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-cmd-alert</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/module/cmd-find/pom.xml b/module/cmd-find/pom.xml
+index 928f63a8..d1420729 100644
+--- a/module/cmd-find/pom.xml
++++ b/module/cmd-find/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-cmd-find</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/module/cmd-list/pom.xml b/module/cmd-list/pom.xml
+index 689b83ee..493fd21b 100644
+--- a/module/cmd-list/pom.xml
++++ b/module/cmd-list/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-cmd-list</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/module/cmd-send/pom.xml b/module/cmd-send/pom.xml
+index e50a4bec..34b78e4e 100644
+--- a/module/cmd-send/pom.xml
++++ b/module/cmd-send/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-cmd-send</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/module/cmd-server/pom.xml b/module/cmd-server/pom.xml
+index daf146dc..1dd3d9ba 100644
+--- a/module/cmd-server/pom.xml
++++ b/module/cmd-server/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-cmd-server</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/module/pom.xml b/module/pom.xml
+index aff2c070..91830d0e 100644
+--- a/module/pom.xml
++++ b/module/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>pom</packaging>
+@@ -34,7 +33,7 @@
+ 
+     <dependencies>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-api</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+diff --git a/module/reconnect-yaml/pom.xml b/module/reconnect-yaml/pom.xml
+index 8e82446f..7f6eda30 100644
+--- a/module/reconnect-yaml/pom.xml
++++ b/module/reconnect-yaml/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-module</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-module-reconnect-yaml</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/native/pom.xml b/native/pom.xml
+index 082f0908..2009e9bb 100644
+--- a/native/pom.xml
++++ b/native/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-native</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+diff --git a/pom.xml b/pom.xml
+index 714d421d..4583e2ab 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -9,7 +9,7 @@
+         <version>9</version>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
++    <groupId>tc.oc</groupId>
+     <artifactId>bungeecord-parent</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>pom</packaging>
+@@ -30,6 +30,28 @@
+         </license>
+     </licenses>
+ 
++    <repositories>
++        <repository>
++            <id>pa-snapshots</id>
++            <url>https://repo.extension.ws/content/repositories/snapshots</url>
++        </repository>
++        <repository>
++            <id>pa-releases</id>
++            <url>https://repo.extension.ws/content/repositories/releases</url>
++        </repository>
++    </repositories>
++
++    <distributionManagement>
++        <repository>
++            <id>pa-deployment</id>
++            <url>https://repo.extension.ws/content/repositories/releases</url>
++        </repository>
++        <snapshotRepository>
++            <id>pa-deployment</id>
++            <url>https://repo.extension.ws/content/repositories/snapshots</url>
++        </snapshotRepository>
++    </distributionManagement>
++
+     <developers>
+         <developer>
+             <id>md_5</id>
+@@ -66,9 +88,9 @@
+ 
+     <properties>
+         <build.number>unknown</build.number>
+-        <netty.version>4.1.15.Final</netty.version>
+-        <maven.compiler.source>1.7</maven.compiler.source>
+-        <maven.compiler.target>1.7</maven.compiler.target>
++        <netty.version>4.1.6.Final</netty.version>
++        <maven.compiler.source>1.8</maven.compiler.source>
++        <maven.compiler.target>1.8</maven.compiler.target>
+         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+     </properties>
+ 
+@@ -82,16 +104,10 @@
+         <dependency>
+             <groupId>com.google.guava</groupId>
+             <artifactId>guava</artifactId>
+-            <version>20.0</version>
++            <version>17.0</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>com.google.code.findbugs</groupId>
+-            <artifactId>findbugs-annotations</artifactId>
+-            <version>3.0.1</version>
+-            <scope>provided</scope>
+-        </dependency>
+-        <dependency>
+             <groupId>org.projectlombok</groupId>
+             <artifactId>lombok</artifactId>
+             <version>1.16.16</version>
+@@ -117,26 +133,6 @@
+                     </execution>
+                 </executions>
+             </plugin>
+-            <plugin>
+-                <groupId>org.codehaus.mojo</groupId>
+-                <artifactId>animal-sniffer-maven-plugin</artifactId>
+-                <version>1.15</version>
+-                <executions>
+-                    <execution>
+-                        <phase>process-classes</phase>
+-                        <goals>
+-                            <goal>check</goal>
+-                        </goals>
+-                    </execution>
+-                </executions>
+-                <configuration>
+-                    <signature>
+-                        <groupId>org.codehaus.mojo.signature</groupId>
+-                        <artifactId>java17</artifactId>
+-                        <version>1.0</version>
+-                    </signature>
+-                </configuration>
+-            </plugin>
+             <!-- OSS Parent 9 uses 2.7, 2.10+ is broken anyway -->
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+diff --git a/protocol/pom.xml b/protocol/pom.xml
+index bf4b399a..d3b3ff0a 100644
+--- a/protocol/pom.xml
++++ b/protocol/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-protocol</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -20,7 +19,7 @@
+ 
+     <dependencies>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-chat</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+diff --git a/proxy/pom.xml b/proxy/pom.xml
+index 211f4ded..1c1d6c1e 100644
+--- a/proxy/pom.xml
++++ b/proxy/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-proxy</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -55,31 +54,31 @@
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-api</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-log</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-native</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-protocol</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-query</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+diff --git a/query/pom.xml b/query/pom.xml
+index 9ecb2612..97b56b58 100644
+--- a/query/pom.xml
++++ b/query/pom.xml
+@@ -4,13 +4,12 @@
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+-        <groupId>net.md-5</groupId>
++        <groupId>tc.oc</groupId>
+         <artifactId>bungeecord-parent</artifactId>
+         <version>1.12-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+-    <groupId>net.md-5</groupId>
+     <artifactId>bungeecord-query</artifactId>
+     <version>1.12-SNAPSHOT</version>
+     <packaging>jar</packaging>
+@@ -26,7 +25,7 @@
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+-            <groupId>net.md-5</groupId>
++            <groupId>tc.oc</groupId>
+             <artifactId>bungeecord-api</artifactId>
+             <version>${project.version}</version>
+             <scope>compile</scope>
+-- 
+2.11.0 (Apple Git-81)
+

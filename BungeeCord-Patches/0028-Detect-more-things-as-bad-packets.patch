@@ -1,0 +1,30 @@
+From a11da6e2395752842a1c855ac4637ed89947db55 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Wed, 3 Feb 2016 06:26:20 -0500
+Subject: [PATCH] Detect more things as bad packets
+
+
+diff --git a/protocol/src/main/java/net/md_5/bungee/protocol/MinecraftDecoder.java b/protocol/src/main/java/net/md_5/bungee/protocol/MinecraftDecoder.java
+index 12278719..96cb429b 100644
+--- a/protocol/src/main/java/net/md_5/bungee/protocol/MinecraftDecoder.java
++++ b/protocol/src/main/java/net/md_5/bungee/protocol/MinecraftDecoder.java
+@@ -30,8 +30,14 @@ public class MinecraftDecoder extends MessageToMessageDecoder<ByteBuf>
+             DefinedPacket packet = prot.createPacket( packetId, protocolVersion );
+             if ( packet != null )
+             {
+-                packet.read0( in, prot.getDirection(), protocolVersion );
+-
++                try
++                {
++                    packet.read0( in, prot.getDirection(), protocolVersion );
++                }
++                catch( IndexOutOfBoundsException e )
++                {
++                    throw new BadPacketException( "Unexpected end of packet " + packet.getClass(), e );
++                }
+                 if ( in.isReadable() )
+                 {
+                     throw new BadPacketException( "Did not read all bytes from packet " + packet.getClass() + " " + packetId + " Protocol " + protocol + " Direction " + prot );
+-- 
+2.11.0 (Apple Git-81)
+

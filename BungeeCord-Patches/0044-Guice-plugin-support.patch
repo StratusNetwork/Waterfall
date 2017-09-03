@@ -1,0 +1,628 @@
+From 334476880cd6c44cc5cf91141902565b4a94b8ae Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Tue, 27 Dec 2016 00:12:23 -0500
+Subject: [PATCH] Guice plugin support
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/ProxyInstanceModule.java b/api/src/main/java/net/md_5/bungee/api/ProxyInstanceModule.java
+new file mode 100644
+index 00000000..2bee9679
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/ProxyInstanceModule.java
+@@ -0,0 +1,31 @@
++package net.md_5.bungee.api;
++
++import java.util.Collection;
++
++import net.md_5.bungee.api.plugin.Plugin;
++import net.md_5.bungee.api.plugin.PluginInstanceModule;
++import tc.oc.inject.KeyedModule;
++import tc.oc.inject.ProtectedBinder;
++
++public class ProxyInstanceModule extends KeyedModule {
++
++    private final ProxyServer proxy;
++    private final Collection<Plugin> plugins;
++
++    public ProxyInstanceModule(ProxyServer proxy, Collection<Plugin> plugins) {
++        super(proxy);
++        this.proxy = proxy;
++        this.plugins = plugins;
++    }
++
++    @Override
++    protected void configure() {
++        install(new ProxyModule());
++        bind(ProxyServer.class).toInstance(proxy);
++
++        for(Plugin plugin : plugins) {
++            ProtectedBinder.newProtectedBinder(binder())
++                           .install(new PluginInstanceModule(plugin));
++        }
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/ProxyModule.java b/api/src/main/java/net/md_5/bungee/api/ProxyModule.java
+new file mode 100644
+index 00000000..b563a959
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/ProxyModule.java
+@@ -0,0 +1,49 @@
++package net.md_5.bungee.api;
++
++import java.util.Collection;
++import java.util.Map;
++
++import com.google.inject.Provides;
++import net.md_5.bungee.api.config.ServerInfo;
++import net.md_5.bungee.api.connection.ProxiedPlayer;
++import net.md_5.bungee.api.plugin.PluginManager;
++import net.md_5.bungee.api.scheduler.TaskScheduler;
++import tc.oc.inject.SingletonModule;
++import tc.oc.minecraft.api.command.ConsoleCommandSender;
++import tc.oc.minecraft.api.plugin.PluginFinder;
++import tc.oc.minecraft.api.server.LocalServer;
++
++public class ProxyModule extends SingletonModule {
++
++    @Override
++    protected void configure() {
++        bind(tc.oc.minecraft.api.server.Server.class).to(LocalServer.class);
++        bind(LocalServer.class).to(ProxyServer.class);
++        bind(PluginFinder.class).to(PluginManager.class);
++    }
++
++    @Provides
++    PluginManager pluginManager(ProxyServer proxy) {
++        return proxy.getPluginManager();
++    }
++
++    @Provides
++    TaskScheduler bukkitScheduler(ProxyServer proxy) {
++        return proxy.getScheduler();
++    }
++
++    @Provides
++    ConsoleCommandSender consoleCommandSender(ProxyServer proxy) {
++        return proxy.getConsoleSender();
++    }
++
++    @Provides
++    Map<String, ServerInfo> serverMap(ProxyServer proxy) {
++        return proxy.getServersCopy();
++    }
++
++    @Provides
++    Collection<ProxiedPlayer> players(ProxyServer proxy) {
++        return proxy.getOnlinePlayers();
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/ModularPlugin.java b/api/src/main/java/net/md_5/bungee/api/plugin/ModularPlugin.java
+new file mode 100644
+index 00000000..5e674b68
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/ModularPlugin.java
+@@ -0,0 +1,18 @@
++package net.md_5.bungee.api.plugin;
++
++import com.google.inject.Module;
++import tc.oc.inject.ProtectedBinder;
++
++class ModularPlugin extends Plugin {
++
++    private final Module module;
++
++    ModularPlugin(Module module) {
++        this.module = module;
++    }
++
++    @Override
++    public void configure(ProtectedBinder binder) {
++        binder.install(module);
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java b/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
+index 5bc19f72..f2b68e42 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
+@@ -1,15 +1,22 @@
+ package net.md_5.bungee.api.plugin;
+ 
+-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+ import java.io.File;
+ import java.io.InputStream;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+ import java.util.logging.Logger;
++import javax.inject.Inject;
++import javax.inject.Provider;
++
++import com.google.common.util.concurrent.ThreadFactoryBuilder;
++import com.google.inject.Injector;
+ import lombok.Getter;
+ import net.md_5.bungee.api.ProxyServer;
+ import net.md_5.bungee.api.config.ConfigurationAdapter;
+ import net.md_5.bungee.api.scheduler.GroupedThreadFactory;
++import tc.oc.minecraft.api.event.EventRegistry;
++import tc.oc.minecraft.api.event.ListenerContext;
++import tc.oc.exception.ExceptionHandler;
+ 
+ /**
+  * Represents any Plugin that may be loaded at runtime to enhance existing
+@@ -27,6 +34,43 @@ public class Plugin implements tc.oc.minecraft.api.plugin.Plugin
+     @Getter
+     private Logger logger;
+ 
++    @Inject private Injector injector;
++    @Inject private ExceptionHandler exceptionHandler;
++    @Inject private EventRegistry eventRegistry;
++    @Inject private Provider<ListenerContext> listenerContext;
++
++    protected void assertInjected() {
++        if(injector == null) {
++            throw new IllegalStateException("Not available until plugin has been injected");
++        }
++    }
++
++    @Override
++    public Injector injector() {
++        assertInjected();
++        return injector;
++    }
++
++    @Override
++    public ExceptionHandler exceptionHandler() {
++        assertInjected();
++        return exceptionHandler;
++    }
++
++    @Override
++    public EventRegistry eventRegistry() {
++        assertInjected();
++        return eventRegistry;
++    }
++
++    public final void preEnable() {
++        listenerContext.get().enable();
++    }
++
++    public final void postDisable() {
++        listenerContext.get().disable();
++    }
++
+     /**
+      * Called when the plugin has just been loaded. Most of the proxy will not
+      * be initialized, so only use it for registering
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginEventRegistry.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginEventRegistry.java
+new file mode 100644
+index 00000000..7ca74351
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginEventRegistry.java
+@@ -0,0 +1,32 @@
++package net.md_5.bungee.api.plugin;
++
++import javax.inject.Inject;
++
++import tc.oc.minecraft.api.event.EventRegistry;
++import tc.oc.minecraft.api.event.Listener;
++
++public class PluginEventRegistry implements EventRegistry {
++
++    private final PluginManager pluginManager;
++    private final Plugin plugin;
++
++    @Inject public PluginEventRegistry(PluginManager pluginManager, Plugin plugin) {
++        this.pluginManager = pluginManager;
++        this.plugin = plugin;
++    }
++
++    @Override
++    public void registerListener(Listener listener) {
++        pluginManager.registerListener(plugin, listener);
++    }
++
++    @Override
++    public void unregisterListener(Listener listener) {
++        pluginManager.unregisterListener(listener);
++    }
++
++    @Override
++    public void unregisterAll() {
++        pluginManager.unregisterListeners(plugin);
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginInstanceModule.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginInstanceModule.java
+new file mode 100644
+index 00000000..ff87cb9b
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginInstanceModule.java
+@@ -0,0 +1,19 @@
++package net.md_5.bungee.api.plugin;
++
++import tc.oc.inject.ProtectedModule;
++
++public class PluginInstanceModule extends ProtectedModule {
++
++    private final Plugin plugin;
++
++    public PluginInstanceModule(Plugin plugin) {
++        this.plugin = plugin;
++    }
++
++    @Override
++    protected void configure() {
++        install(new PluginModule());
++        bind(Plugin.class).toInstance(plugin);
++        plugin.configure(binder());
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+index 5ced80fa..98b5c662 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+@@ -2,6 +2,7 @@ package net.md_5.bungee.api.plugin;
+ 
+ import com.google.common.base.Preconditions;
+ import com.google.common.collect.ArrayListMultimap;
++import com.google.common.collect.Lists;
+ import com.google.common.collect.Multimap;
+ import java.io.File;
+ import java.io.InputStream;
+@@ -19,13 +20,17 @@ import java.util.Set;
+ import java.util.Stack;
+ import java.util.jar.JarEntry;
+ import java.util.jar.JarFile;
++import java.util.logging.Handler;
+ import java.util.logging.Level;
+ import java.util.regex.Pattern;
+ 
++import com.google.inject.Guice;
++import com.google.inject.Module;
+ import lombok.Getter;
+ import lombok.RequiredArgsConstructor;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.CommandSender;
++import net.md_5.bungee.api.ProxyInstanceModule;
+ import net.md_5.bungee.api.ProxyServer;
+ import net.md_5.bungee.api.connection.ProxiedPlayer;
+ import net.md_5.bungee.event.EventBus;
+@@ -40,7 +45,7 @@ import tc.oc.minecraft.api.plugin.PluginFinder;
+  * example event handling and plugin management.
+  */
+ @RequiredArgsConstructor
+-public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.EventBus
++public class PluginManager implements PluginFinder
+ {
+ 
+     private static final Pattern argsSplit = Pattern.compile( " " );
+@@ -52,11 +57,12 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+     private final Map<String, Plugin> plugins = new LinkedHashMap<>();
+     private final Map<String, Command> commandMap = new HashMap<>();
+     private Map<String, PluginDescription> toLoad = new HashMap<>();
++    private final @Getter List<Plugin> instantiatedPlugins = new ArrayList<>();
+     private final @Getter List<Plugin> loadedPlugins = new ArrayList<>();
+     private final @Getter List<Plugin> enabledPlugins = new ArrayList<>();
+     private final Map<String, PluginClassloader> classLoaders = new HashMap<>();
+     private final Multimap<Plugin, Command> commandsByPlugin = ArrayListMultimap.create();
+-    private final Multimap<Plugin, Listener> listenersByPlugin = ArrayListMultimap.create();
++    private final Multimap<Plugin, tc.oc.minecraft.api.event.Listener> listenersByPlugin = ArrayListMultimap.create();
+ 
+     @SuppressWarnings("unchecked")
+     public PluginManager(ProxyServer proxy)
+@@ -229,14 +235,35 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+         }
+         toLoad.clear();
+         toLoad = null;
++
++        try {
++            Guice.createInjector(new ProxyInstanceModule(proxy, loadedPlugins));
++        } catch(RuntimeException ex) {
++            proxy.getLogger().log(Level.SEVERE, "Injector creation failed, server will shut down", ex);
++            throw ex;
++        }
++
++        for(Plugin plugin : loadedPlugins) {
++            try {
++                plugin.onLoad();
++            } catch(Throwable t) {
++                proxy.getLogger().log( Level.SEVERE, "Error loading plugin " + plugin.getDescription().getName(), t );
++                if(proxy.getConfig().isRequireAllPlugins()) {
++                    throw t;
++                }
++            }
++        }
+     }
+ 
+     public void enablePlugins()
+     {
+         for ( Plugin plugin : loadedPlugins )
+         {
++            if(!plugin.isActive()) continue;
++
+             try
+             {
++                plugin.preEnable();
+                 plugin.onEnable();
+                 enabledPlugins.add(plugin);
+                 ProxyServer.getInstance().getLogger().log( Level.INFO, "Enabled plugin {0} version {1} by {2}", new Object[]
+@@ -253,6 +280,26 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+         }
+     }
+ 
++    public void disablePlugins() {
++        proxy.getLogger().info( "Disabling plugins" );
++
++        for(Plugin plugin : Lists.reverse(new ArrayList<>(enabledPlugins))) {
++            if(!plugin.isActive()) continue;
++
++            try {
++                plugin.onDisable();
++                plugin.postDisable();
++                for(Handler handler : plugin.getLogger().getHandlers()) {
++                    handler.close();
++                }
++            } catch(Throwable t ) {
++                proxy.getLogger().log( Level.SEVERE, "Exception disabling plugin " + plugin.getDescription().getName(), t );
++            }
++            proxy.getScheduler().cancel( plugin );
++            plugin.getExecutorService().shutdownNow();
++        }
++    }
++
+     private boolean loadPlugin(Map<PluginDescription, Boolean> pluginStatuses, Map<PluginDescription, PluginClassloader> pluginLoaders, Stack<PluginDescription> dependStack, PluginDescription plugin) throws Exception
+     {
+         if ( pluginStatuses.containsKey( plugin ) )
+@@ -325,11 +372,19 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+                 } );
+                 pluginLoaders.put(plugin, loader);
+                 Class<?> main = loader.loadClass( plugin.getMain() );
+-                Plugin clazz = (Plugin) main.getDeclaredConstructor().newInstance();
++                final Plugin clazz;
++                if(Plugin.class.isAssignableFrom(main)) {
++                    clazz = (Plugin) main.getDeclaredConstructor().newInstance();
++                } else if(Module.class.isAssignableFrom(main)) {
++                    clazz = new ModularPlugin((Module) main.newInstance());
++                } else {
++                    throw new IllegalStateException("main class `" + main.getName() +
++                                                    "' must extend either " + Plugin.class.getName() +
++                                                    " or " + Module.class.getName());
++                }
+ 
+                 clazz.init( proxy, plugin );
+                 plugins.put( plugin.getName(), clazz );
+-                clazz.onLoad();
+                 loadedPlugins.add(clazz);
+                 ProxyServer.getInstance().getLogger().log( Level.INFO, "Loaded plugin {0} version {1} by {2}", new Object[]
+                 {
+@@ -337,7 +392,7 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+                 } );
+             } catch ( Throwable t )
+             {
+-                proxy.getLogger().log( Level.SEVERE, "Error loading plugin " + plugin.getName(), t );
++                proxy.getLogger().log( Level.SEVERE, "Error instantiating plugin " + plugin.getName(), t );
+                 if(proxy.getConfig().isRequireAllPlugins()) {
+                     throw t;
+                 }
+@@ -419,24 +474,6 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+         return event;
+     }
+ 
+-    @Override
+-    public void registerListener(tc.oc.minecraft.api.plugin.Plugin plugin, tc.oc.minecraft.api.event.Listener listener)
+-    {
+-        registerListener( (Plugin) plugin, (Listener) listener );
+-    }
+-
+-    @Override
+-    public void unregisterListener(tc.oc.minecraft.api.event.Listener listener)
+-    {
+-        unregisterListener( (Listener) listener );
+-    }
+-
+-    @Override
+-    public void unregisterListeners(tc.oc.minecraft.api.plugin.Plugin plugin)
+-    {
+-        unregisterListeners( (Plugin) plugin );
+-    }
+-
+     /**
+      * Register a {@link Listener} for receiving called events. Methods in this
+      * Object which wish to receive events must be annotated with the
+@@ -447,6 +484,10 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+      */
+     public void registerListener(Plugin plugin, Listener listener)
+     {
++        registerListener(plugin, (tc.oc.minecraft.api.event.Listener) listener);
++    }
++
++    public void registerListener(Plugin plugin, tc.oc.minecraft.api.event.Listener listener) {
+         eventBus.register( listener );
+         listenersByPlugin.put( plugin, listener );
+     }
+@@ -458,6 +499,10 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+      */
+     public void unregisterListener(Listener listener)
+     {
++        unregisterListener((tc.oc.minecraft.api.event.Listener) listener);
++    }
++
++    public void unregisterListener(tc.oc.minecraft.api.event.Listener listener) {
+         eventBus.unregister( listener );
+         listenersByPlugin.values().remove( listener );
+     }
+@@ -467,7 +512,7 @@ public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.Ev
+      */
+     public void unregisterListeners(Plugin plugin)
+     {
+-        for ( Iterator<Listener> it = listenersByPlugin.get( plugin ).iterator(); it.hasNext(); )
++        for (Iterator<tc.oc.minecraft.api.event.Listener> it = listenersByPlugin.get(plugin ).iterator(); it.hasNext(); )
+         {
+             eventBus.unregister( it.next() );
+             it.remove();
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginModule.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginModule.java
+new file mode 100644
+index 00000000..bd309e8e
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginModule.java
+@@ -0,0 +1,38 @@
++package net.md_5.bungee.api.plugin;
++
++import javax.inject.Singleton;
++
++import com.google.inject.Provides;
++import net.md_5.bungee.config.Configuration;
++import tc.oc.exception.ExceptionHandler;
++import tc.oc.inject.ProtectedModule;
++import tc.oc.minecraft.api.event.EventRegistry;
++import tc.oc.minecraft.api.event.ListenerBinder;
++import tc.oc.minecraft.api.plugin.PluginExceptionHandler;
++import tc.oc.minecraft.api.scheduler.Scheduler;
++
++public class PluginModule extends ProtectedModule {
++
++    @Override
++    protected void configure() {
++        new ListenerBinder(binder());
++
++        bind(tc.oc.minecraft.api.plugin.Plugin.class).to(Plugin.class);
++        bind(tc.oc.minecraft.api.plugin.PluginDescription.class).to(PluginDescription.class);
++        bind(tc.oc.minecraft.api.configuration.Configuration.class).to(Configuration.class);
++
++        bind(ExceptionHandler.class).to(PluginExceptionHandler.class).in(Singleton.class);
++        bind(EventRegistry.class).to(PluginEventRegistry.class).in(Singleton.class);
++        bind(Scheduler.class).to(PluginScheduler.class).in(Singleton.class);
++    }
++
++    @Provides
++    PluginDescription description(Plugin plugin) {
++        return plugin.getDescription();
++    }
++
++    @Provides
++    PluginLogger logger(Plugin plugin) {
++        return (PluginLogger) plugin.getLogger();
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginScheduler.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginScheduler.java
+new file mode 100644
+index 00000000..fe94305e
+--- /dev/null
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginScheduler.java
+@@ -0,0 +1,43 @@
++package net.md_5.bungee.api.plugin;
++
++import java.time.Duration;
++import java.util.concurrent.TimeUnit;
++import javax.annotation.Nullable;
++import javax.inject.Inject;
++
++import net.md_5.bungee.api.scheduler.ScheduledTask;
++import net.md_5.bungee.api.scheduler.TaskScheduler;
++import tc.oc.minecraft.api.scheduler.Scheduler;
++import tc.oc.minecraft.api.scheduler.Task;
++import tc.oc.minecraft.api.scheduler.Tickable;
++
++public class PluginScheduler implements Scheduler {
++
++    private final Plugin plugin;
++    private final TaskScheduler scheduler;
++
++    @Inject public PluginScheduler(Plugin plugin, TaskScheduler scheduler) {
++        this.plugin = plugin;
++        this.scheduler = scheduler;
++    }
++
++    @Override
++    public ScheduledTask schedule(boolean sync, @Nullable Duration delay, @Nullable Duration period, Runnable task) {
++        return scheduler.schedule(
++            plugin,
++            task,
++            delay == null ? 0 : delay.toNanos(),
++            period == null ? -1 : period.toNanos(),
++            TimeUnit.NANOSECONDS
++        );
++    }
++
++    @Override
++    public Task schedule(Tickable tickable) {
++        final Duration period = tickable.tickPeriod();
++        if(period.isZero()) {
++            throw new IllegalArgumentException("Bungee tick periods must be non-zero");
++        }
++        return schedule(tickable.isSynchronous(), tickable.initialDelay(), period, tickable::tick);
++    }
++}
+diff --git a/api/src/main/java/net/md_5/bungee/api/scheduler/ScheduledTask.java b/api/src/main/java/net/md_5/bungee/api/scheduler/ScheduledTask.java
+index bc40b889..cd888629 100644
+--- a/api/src/main/java/net/md_5/bungee/api/scheduler/ScheduledTask.java
++++ b/api/src/main/java/net/md_5/bungee/api/scheduler/ScheduledTask.java
+@@ -1,11 +1,12 @@
+ package net.md_5.bungee.api.scheduler;
+ 
+ import net.md_5.bungee.api.plugin.Plugin;
++import tc.oc.minecraft.api.scheduler.Task;
+ 
+ /**
+  * Represents a task scheduled for execution by the {@link TaskScheduler}.
+  */
+-public interface ScheduledTask
++public interface ScheduledTask extends Task
+ {
+ 
+     /**
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 7bea5311..4dc54879 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -6,7 +6,6 @@ import com.google.common.base.Preconditions;
+ import com.google.common.base.Predicate;
+ import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Iterables;
+-import com.google.common.collect.Lists;
+ import com.google.common.collect.Sets;
+ import com.google.common.util.concurrent.ThreadFactoryBuilder;
+ import com.google.gson.Gson;
+@@ -26,7 +25,6 @@ import java.io.IOException;
+ import java.io.PrintStream;
+ import java.net.InetSocketAddress;
+ import java.text.MessageFormat;
+-import java.util.ArrayList;
+ import java.util.Collection;
+ import java.util.Collections;
+ import java.util.HashMap;
+@@ -65,7 +63,6 @@ import net.md_5.bungee.api.config.ConfigurationAdapter;
+ import net.md_5.bungee.api.config.ListenerInfo;
+ import net.md_5.bungee.api.config.ServerInfo;
+ import net.md_5.bungee.api.connection.ProxiedPlayer;
+-import net.md_5.bungee.api.plugin.Plugin;
+ import net.md_5.bungee.api.plugin.PluginManager;
+ import net.md_5.bungee.chat.ComponentSerializer;
+ import net.md_5.bungee.chat.ScoreComponentSerializer;
+@@ -432,24 +429,7 @@ public class BungeeCord extends ProxyServer
+                 saveThread.cancel();
+                 metricsThread.cancel();
+ 
+-                // TODO: Fix this shit
+-                getLogger().info( "Disabling plugins" );
+-                for ( Plugin plugin : Lists.reverse( new ArrayList<>( pluginManager.getEnabledPlugins() ) ) )
+-                {
+-                    try
+-                    {
+-                        plugin.onDisable();
+-                        for ( Handler handler : plugin.getLogger().getHandlers() )
+-                        {
+-                            handler.close();
+-                        }
+-                    } catch ( Throwable t )
+-                    {
+-                        getLogger().log( Level.SEVERE, "Exception disabling plugin " + plugin.getDescription().getName(), t );
+-                    }
+-                    getScheduler().cancel( plugin );
+-                    plugin.getExecutorService().shutdownNow();
+-                }
++                pluginManager.disablePlugins();
+ 
+                 getLogger().info( "Closing IO threads" );
+                 eventLoops.shutdownGracefully();
+-- 
+2.11.0 (Apple Git-81)
+

@@ -1,0 +1,26 @@
+From e0d22dc464cc61330395483710a1ec6706f91c22 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Fri, 13 Feb 2015 02:28:52 -0500
+Subject: [PATCH] Properly serialize all BaseComponent subclasses
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+index 5756fc4a..8fbd4bcf 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+@@ -18,9 +18,9 @@ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+ {
+ 
+     private final static Gson gson = new GsonBuilder().
+-            registerTypeAdapter( BaseComponent.class, new ComponentSerializer() ).
+-            registerTypeAdapter( TextComponent.class, new TextComponentSerializer() ).
+-            registerTypeAdapter( TranslatableComponent.class, new TranslatableComponentSerializer() ).
++            registerTypeHierarchyAdapter( BaseComponent.class, new ComponentSerializer() ).
++            registerTypeHierarchyAdapter( TextComponent.class, new TextComponentSerializer() ).
++            registerTypeHierarchyAdapter( TranslatableComponent.class, new TranslatableComponentSerializer() ).
+             create();
+ 
+     public final static ThreadLocal<HashSet<BaseComponent>> serializedComponents = new ThreadLocal<HashSet<BaseComponent>>();
+-- 
+2.11.0 (Apple Git-81)
+

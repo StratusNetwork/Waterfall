@@ -1,0 +1,53 @@
+From 5fb27ab0789c2b38a90e1a78a80f046c310b1f79 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 24 Mar 2016 15:29:23 -0400
+Subject: [PATCH] Protocol version API
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index ea3afa71..7081be01 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -4,6 +4,7 @@ import com.google.common.base.Charsets;
+ import com.google.common.base.Joiner;
+ import com.google.common.base.Preconditions;
+ import com.google.common.base.Predicate;
++import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Iterables;
+ import com.google.common.collect.Lists;
+ import com.google.common.collect.Sets;
+@@ -35,6 +36,7 @@ import java.util.Map;
+ import java.util.MissingResourceException;
+ import java.util.PropertyResourceBundle;
+ import java.util.ResourceBundle;
++import java.util.Set;
+ import java.util.Timer;
+ import java.util.TimerTask;
+ import java.util.UUID;
+@@ -729,4 +731,9 @@ public class BungeeCord extends ProxyServer
+     {
+         return new BungeeTitle();
+     }
++
++    @Override
++    public Set<Integer> getProtocolVersions() {
++        return ImmutableSet.copyOf(ProtocolConstants.SUPPORTED_VERSION_IDS);
++    }
+ }
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index 5133eefe..1e4128eb 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -672,4 +672,9 @@ public final class UserConnection implements ProxiedPlayer
+     {
+         return !ch.isClosed();
+     }
++
++    @Override
++    public int getProtocolVersion() {
++        return getPendingConnection().getVersion();
++    }
+ }
+-- 
+2.11.0 (Apple Git-81)
+

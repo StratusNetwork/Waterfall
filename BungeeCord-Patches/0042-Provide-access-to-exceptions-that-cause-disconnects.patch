@@ -1,0 +1,74 @@
+From 308bd4862dccdcddbb99fdc84ddf3d09b2184e83 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 6 Nov 2016 02:14:59 -0500
+Subject: [PATCH] Provide access to exceptions that cause disconnects
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/connection/ProxiedPlayer.java b/api/src/main/java/net/md_5/bungee/api/connection/ProxiedPlayer.java
+index c3769326..39a8d899 100644
+--- a/api/src/main/java/net/md_5/bungee/api/connection/ProxiedPlayer.java
++++ b/api/src/main/java/net/md_5/bungee/api/connection/ProxiedPlayer.java
+@@ -268,4 +268,6 @@ public interface ProxiedPlayer extends Connection, CommandSender, tc.oc.minecraf
+      * not occurred for this {@link ProxiedPlayer} yet.
+      */
+     Map<String, String> getModList();
++
++    Throwable getDisconnectException();
+ }
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index 526bc28c..e4e2604c 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -150,6 +150,9 @@ public final class UserConnection implements ProxiedPlayer
+         }
+     };
+ 
++    @Getter
++    private Throwable disconnectException;
++
+     public void init()
+     {
+         this.entityRewrite = EntityMap.getEntityMap( getPendingConnection().getVersion() );
+@@ -352,6 +355,13 @@ public final class UserConnection implements ProxiedPlayer
+         b.connect().addListener( listener );
+     }
+ 
++    public void disconnect(Throwable exception) {
++        if(disconnectException == null) {
++            disconnectException = exception;
++        }
++        disconnect(Util.exception(exception));
++    }
++
+     @Override
+     public void disconnect(String reason)
+     {
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java b/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
+index a8c737d1..3a5cd1be 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
+@@ -68,7 +68,7 @@ public class DownstreamBridge extends PacketHandler
+             con.sendMessage( bungee.getTranslation( "server_went_down" ) );
+         } else
+         {
+-            con.disconnect( Util.exception( t ) );
++            con.disconnect( t );
+         }
+     }
+ 
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java b/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
+index 5e9fadd0..740b8900 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/UpstreamBridge.java
+@@ -45,7 +45,7 @@ public class UpstreamBridge extends PacketHandler
+     @Override
+     public void exception(Throwable t) throws Exception
+     {
+-        con.disconnect( Util.exception( t ) );
++        con.disconnect( t );
+     }
+ 
+     @Override
+-- 
+2.11.0 (Apple Git-81)
+

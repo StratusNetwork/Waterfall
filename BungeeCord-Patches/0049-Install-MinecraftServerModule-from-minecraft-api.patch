@@ -1,0 +1,28 @@
+From 84c05fefa3603e9181586aaa3171ef1f8d7c1f11 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 4 Feb 2017 03:09:32 -0500
+Subject: [PATCH] Install MinecraftServerModule from minecraft-api
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/ProxyModule.java b/api/src/main/java/net/md_5/bungee/api/ProxyModule.java
+index b563a959..db6a0da4 100644
+--- a/api/src/main/java/net/md_5/bungee/api/ProxyModule.java
++++ b/api/src/main/java/net/md_5/bungee/api/ProxyModule.java
+@@ -12,11 +12,14 @@ import tc.oc.inject.SingletonModule;
+ import tc.oc.minecraft.api.command.ConsoleCommandSender;
+ import tc.oc.minecraft.api.plugin.PluginFinder;
+ import tc.oc.minecraft.api.server.LocalServer;
++import tc.oc.minecraft.api.server.MinecraftServerModule;
+ 
+ public class ProxyModule extends SingletonModule {
+ 
+     @Override
+     protected void configure() {
++        install(new MinecraftServerModule());
++
+         bind(tc.oc.minecraft.api.server.Server.class).to(LocalServer.class);
+         bind(LocalServer.class).to(ProxyServer.class);
+         bind(PluginFinder.class).to(PluginManager.class);
+-- 
+2.11.0 (Apple Git-81)
+

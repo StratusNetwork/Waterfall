@@ -1,0 +1,31 @@
+From 1b5e6016c4c49d5683679cbda2e3a5ef4965f013 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Wed, 4 Jan 2017 18:37:00 -0500
+Subject: [PATCH] Stringify any non-component passed to TranslatableComponent
+ with list
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+index 34d2ed16..03d1ba0c 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+@@ -74,12 +74,10 @@ public class TranslatableComponent extends BaseComponent
+         List<BaseComponent> temp = new ArrayList<BaseComponent>();
+         for ( Object w : with )
+         {
+-            if ( w instanceof String )
+-            {
+-                temp.add( new TextComponent( (String) w ) );
+-            } else
+-            {
+-                temp.add( (BaseComponent) w );
++            if(w instanceof BaseComponent) {
++                temp.add((BaseComponent) w);
++            } else {
++                temp.add(new TextComponent(String.valueOf(w)));
+             }
+         }
+         setWithInternal( temp );
+-- 
+2.11.0 (Apple Git-81)
+

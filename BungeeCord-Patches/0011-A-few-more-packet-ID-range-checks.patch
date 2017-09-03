@@ -1,0 +1,55 @@
+From 48bcda7ccf387ce132247241dafcf5897bd9840e Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 30 Nov 2014 15:02:58 -0500
+Subject: [PATCH] A few more packet ID range checks
+
+
+diff --git a/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java b/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
+index 2b5e7d0f..1a529c04 100644
+--- a/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
++++ b/protocol/src/main/java/net/md_5/bungee/protocol/Protocol.java
+@@ -361,7 +361,7 @@ public enum Protocol
+             {
+                 throw new BadPacketException( "Unsupported protocol version" );
+             }
+-            if ( id > MAX_PACKET_ID )
++            if ( id < 0 || id > MAX_PACKET_ID )
+             {
+                 throw new BadPacketException( "Packet with id " + id + " outside of range " );
+             }
+diff --git a/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap.java b/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap.java
+index d71b5777..a3b125a8 100644
+--- a/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap.java
++++ b/proxy/src/main/java/net/md_5/bungee/entitymap/EntityMap.java
+@@ -9,6 +9,7 @@ import java.io.IOException;
+ import lombok.AccessLevel;
+ import lombok.NoArgsConstructor;
+ import net.md_5.bungee.protocol.DefinedPacket;
++import net.md_5.bungee.protocol.Protocol;
+ import net.md_5.bungee.protocol.ProtocolConstants;
+ 
+ /**
+@@ -214,12 +215,15 @@ public abstract class EntityMap
+         int packetId = DefinedPacket.readVarInt( packet );
+         int packetIdLength = packet.readerIndex() - readerIndex;
+ 
+-        if ( ints[packetId] )
++        if ( 0 <= packetId && packetId < Protocol.MAX_PACKET_ID)
+         {
+-            rewriteInt( packet, oldId, newId, readerIndex + packetIdLength );
+-        } else if ( varints[packetId] )
+-        {
+-            rewriteVarInt( packet, oldId, newId, readerIndex + packetIdLength );
++            if ( ints[packetId] )
++            {
++                rewriteInt( packet, oldId, newId, readerIndex + packetIdLength );
++            } else if ( varints[packetId] )
++            {
++                rewriteVarInt(packet, oldId, newId, readerIndex + packetIdLength);
++            }
+         }
+         packet.readerIndex( readerIndex );
+     }
+-- 
+2.11.0 (Apple Git-81)
+

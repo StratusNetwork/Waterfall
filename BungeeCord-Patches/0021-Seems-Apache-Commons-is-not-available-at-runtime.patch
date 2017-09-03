@@ -1,0 +1,51 @@
+From 4e23490a9c9b1eb85ebbcb098a6cdb4f2078ddf6 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 4 Oct 2015 09:40:12 -0400
+Subject: [PATCH] Seems Apache Commons is not available at runtime
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+index c8ef9791..34722373 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
+ import lombok.Setter;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.ChatStringBuilder;
+-import org.apache.commons.lang.StringEscapeUtils;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
+@@ -196,7 +195,7 @@ public class TextComponent extends BaseComponent
+     }
+ 
+     @Override protected void toStringTerminal(List<String> fields) {
+-        fields.add("text=\"" + StringEscapeUtils.escapeJava(getText()) + "\"");
++        fields.add("text=\"" + getText() + "\"");
+         super.toStringTerminal(fields);
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+index 7725ba0c..a828b649 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+@@ -14,7 +14,6 @@ import java.util.regex.Pattern;
+ 
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.ChatStringBuilder;
+-import org.apache.commons.lang.StringEscapeUtils;
+ 
+ @Getter
+ @Setter
+@@ -224,7 +223,7 @@ public class TranslatableComponent extends BaseComponent
+ 
+     @Override
+     protected void toStringTerminal(List<String> fields) {
+-        fields.add("translate=\"" + StringEscapeUtils.escapeJava(getTranslate()) + "\"");
++        fields.add("translate=\"" + getTranslate() + "\"");
+         super.toStringTerminal(fields);
+     }
+ 
+-- 
+2.11.0 (Apple Git-81)
+

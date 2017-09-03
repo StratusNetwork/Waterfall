@@ -1,0 +1,51 @@
+From b482487d3c5da4c26225d5ada8db84e984ebd60d Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 22 Sep 2016 22:39:31 -0400
+Subject: [PATCH] Sync with minecraft-api
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+index f5e30a51..5ced80fa 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/PluginManager.java
+@@ -33,13 +33,14 @@ import net.md_5.bungee.event.EventHandler;
+ import org.yaml.snakeyaml.Yaml;
+ import org.yaml.snakeyaml.constructor.Constructor;
+ import org.yaml.snakeyaml.introspector.PropertyUtils;
++import tc.oc.minecraft.api.plugin.PluginFinder;
+ 
+ /**
+  * Class to manage bridging between plugin duties and implementation duties, for
+  * example event handling and plugin management.
+  */
+ @RequiredArgsConstructor
+-public class PluginManager implements tc.oc.minecraft.api.plugin.PluginManager
++public class PluginManager implements PluginFinder, tc.oc.minecraft.api.event.EventBus
+ {
+ 
+     private static final Pattern argsSplit = Pattern.compile( " " );
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 3d05a5bb..7bea5311 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -94,6 +94,7 @@ import net.md_5.bungee.query.RemoteQuery;
+ import net.md_5.bungee.scheduler.BungeeScheduler;
+ import net.md_5.bungee.util.CaseInsensitiveMap;
+ import org.fusesource.jansi.AnsiConsole;
++import tc.oc.minecraft.api.plugin.PluginFinder;
+ 
+ /**
+  * Main BungeeCord proxy class.
+@@ -736,4 +737,9 @@ public class BungeeCord extends ProxyServer
+     public Set<Integer> getProtocolVersions() {
+         return ImmutableSet.copyOf(ProtocolConstants.SUPPORTED_VERSION_IDS);
+     }
++
++    @Override
++    public PluginFinder getPluginFinder() {
++        return pluginManager;
++    }
+ }
+-- 
+2.11.0 (Apple Git-81)
+

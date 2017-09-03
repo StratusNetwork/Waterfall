@@ -1,0 +1,272 @@
+From 894095252b52a81cb31a697cb3e779b5c1b1ffc2 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sat, 3 Oct 2015 06:26:47 -0400
+Subject: [PATCH] Improve component cycle detection
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+index 14c291d1..577e612c 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+@@ -1,5 +1,6 @@
+ package net.md_5.bungee.api.chat;
+ 
++import com.google.common.base.Joiner;
+ import lombok.AccessLevel;
+ import lombok.Getter;
+ import lombok.NoArgsConstructor;
+@@ -7,11 +8,13 @@ import lombok.Setter;
+ import net.md_5.bungee.api.ChatColor;
+ 
+ import java.util.ArrayList;
++import java.util.EnumMap;
++import java.util.HashSet;
+ import java.util.List;
+-import lombok.ToString;
++import java.util.Map;
++import java.util.Set;
+ 
+ @Setter
+-@ToString(exclude = "parent")
+ @NoArgsConstructor
+ public abstract class BaseComponent
+ {
+@@ -395,4 +398,93 @@ public abstract class BaseComponent
+             }
+         }
+     }
++
++    protected static final ChatColor[] DECORATIONS = {
++        ChatColor.BOLD,
++        ChatColor.ITALIC,
++        ChatColor.UNDERLINE,
++        ChatColor.STRIKETHROUGH,
++        ChatColor.MAGIC
++    };
++
++    protected static final Joiner JOINER = Joiner.on(", ");
++
++    public Boolean hasFormatRaw(ChatColor format) {
++        switch(format) {
++            case BOLD: return isBoldRaw();
++            case ITALIC: return isItalicRaw();
++            case UNDERLINE: return isUnderlinedRaw();
++            case STRIKETHROUGH: return isStrikethroughRaw();
++            case MAGIC: return isObfuscatedRaw();
++            case RESET: return null;
++        }
++
++        if(getColorRaw() == null) {
++            return null;
++        } else {
++            return getColorRaw() == format;
++        }
++    }
++
++    public Map<ChatColor, Boolean> getFormatsRaw() {
++        EnumMap<ChatColor, Boolean> formats = new EnumMap(ChatColor.class);
++
++        if(getColorRaw() != null) formats.put(getColorRaw(), true);
++
++        for(ChatColor format : DECORATIONS) {
++            final Boolean flag = hasFormatRaw(format);
++            if(flag != null) formats.put(format, flag);
++        }
++
++        return formats;
++    }
++
++    protected void toStringTerminal(List<String> fields) {
++        if(getColorRaw() != null) {
++            fields.add("color=\"" + getColorRaw().name().toLowerCase() + "\"");
++        }
++
++        for(ChatColor format : DECORATIONS) {
++            final Boolean flag = hasFormatRaw(format);
++            if(flag != null) {
++                fields.add(format.name().toLowerCase() + "=" + flag);
++            }
++        }
++
++        if(getClickEvent() != null) {
++            fields.add("clickEvent=" + getClickEvent());
++        }
++    }
++
++    protected void toStringRecursive(List<String> fields) {
++        if(getHoverEvent() != null) {
++            fields.add("hoverEvent=" + getHoverEvent());
++        }
++
++        if(getExtra() != null && !getExtra().isEmpty()) {
++            fields.add("extra=[" + Joiner.on(", ").join(getExtra()) + "]");
++        }
++    }
++
++    private static final ThreadLocal<Set<BaseComponent>> visited = new ThreadLocal<Set<BaseComponent>>() {
++        @Override protected Set<BaseComponent> initialValue() {
++            return new HashSet<BaseComponent>();
++        }
++    };
++
++    @Override
++    public String toString() {
++        List<String> fields = new ArrayList<String>();
++        toStringTerminal(fields);
++        try {
++            if(visited.get().add(this)) {
++                toStringRecursive(fields);
++            } else {
++                fields.add("... (cycle)");
++            }
++        } finally {
++            visited.get().remove(this);
++        }
++        return getClass().getSimpleName() + "{" + JOINER.join(fields) + "}";
++    }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+index 15a26785..9e21ee98 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+@@ -5,9 +5,11 @@ import lombok.Getter;
+ import lombok.NoArgsConstructor;
+ import lombok.Setter;
+ import net.md_5.bungee.api.ChatColor;
++import org.apache.commons.lang.StringEscapeUtils;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
++import java.util.List;
+ import java.util.regex.Matcher;
+ import java.util.regex.Pattern;
+ 
+@@ -212,9 +214,8 @@ public class TextComponent extends BaseComponent
+         super.toLegacyText( builder );
+     }
+ 
+-    @Override
+-    public String toString()
+-    {
+-        return String.format( "TextComponent{text=%s, %s}", text, super.toString() );
++    @Override protected void toStringTerminal(List<String> fields) {
++        fields.add("text=\"" + StringEscapeUtils.escapeJava(getText()) + "\"");
++        super.toStringTerminal(fields);
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+index 79c2e32e..231ed912 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TranslatableComponent.java
+@@ -10,11 +10,10 @@ import java.util.MissingResourceException;
+ import java.util.ResourceBundle;
+ import java.util.regex.Matcher;
+ import java.util.regex.Pattern;
+-import lombok.ToString;
++import org.apache.commons.lang.StringEscapeUtils;
+ 
+ @Getter
+ @Setter
+-@ToString
+ @NoArgsConstructor
+ public class TranslatableComponent extends BaseComponent
+ {
+@@ -249,4 +248,18 @@ public class TranslatableComponent extends BaseComponent
+             builder.append( ChatColor.MAGIC );
+         }
+     }
++
++    @Override
++    protected void toStringTerminal(List<String> fields) {
++        fields.add("translate=\"" + StringEscapeUtils.escapeJava(getTranslate()) + "\"");
++        super.toStringTerminal(fields);
++    }
++
++    @Override
++    protected void toStringRecursive(List<String> fields) {
++        if(getWith() != null && !getWith().isEmpty()) {
++            fields.add("with=[" + JOINER.join(getWith()) + "]");
++        }
++        super.toStringRecursive(fields);
++    }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
+index 9aed9c56..77f678ed 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/BaseComponentSerializer.java
+@@ -10,7 +10,6 @@ import net.md_5.bungee.api.chat.ClickEvent;
+ import net.md_5.bungee.api.chat.HoverEvent;
+ 
+ import java.util.Arrays;
+-import java.util.HashSet;
+ 
+ public class BaseComponentSerializer
+ {
+@@ -78,16 +77,9 @@ public class BaseComponentSerializer
+ 
+     protected void serialize(JsonObject object, BaseComponent component, JsonSerializationContext context)
+     {
+-        boolean first = false;
+-        if ( ComponentSerializer.serializedComponents.get() == null )
+-        {
+-            first = true;
+-            ComponentSerializer.serializedComponents.set( new HashSet<BaseComponent>() );
+-        }
+         try
+         {
+-            Preconditions.checkArgument( !ComponentSerializer.serializedComponents.get().contains( component ), "Component loop" );
+-            ComponentSerializer.serializedComponents.get().add( component );
++            Preconditions.checkArgument( ComponentSerializer.serializedComponents.get().add( component ), "Component loop: " + component );
+             if ( component.getColorRaw() != null )
+             {
+                 object.addProperty( "color", component.getColorRaw().getName() );
+@@ -140,10 +132,6 @@ public class BaseComponentSerializer
+         } finally
+         {
+             ComponentSerializer.serializedComponents.get().remove( component );
+-            if ( first )
+-            {
+-                ComponentSerializer.serializedComponents.set( null );
+-            }
+         }
+     }
+ }
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+index 8fbd4bcf..4acb09b7 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/ComponentSerializer.java
+@@ -23,7 +23,11 @@ public class ComponentSerializer implements JsonDeserializer<BaseComponent>
+             registerTypeHierarchyAdapter( TranslatableComponent.class, new TranslatableComponentSerializer() ).
+             create();
+ 
+-    public final static ThreadLocal<HashSet<BaseComponent>> serializedComponents = new ThreadLocal<HashSet<BaseComponent>>();
++    public final static ThreadLocal<HashSet<BaseComponent>> serializedComponents = new ThreadLocal<HashSet<BaseComponent>>() {
++        @Override protected HashSet<BaseComponent> initialValue() {
++            return new HashSet<BaseComponent>();
++        }
++    };
+ 
+     public static BaseComponent[] parse(String json)
+     {
+diff --git a/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java b/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
+index c01af268..213fb574 100644
+--- a/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
++++ b/chat/src/main/java/net/md_5/bungee/chat/TranslatableComponentSerializer.java
+@@ -38,7 +38,13 @@ public class TranslatableComponentSerializer extends BaseComponentSerializer imp
+         object.addProperty( "translate", src.getTranslate() );
+         if ( src.getWith() != null )
+         {
+-            object.add( "with", context.serialize( src.getWith() ) );
++            try {
++                ComponentSerializer.serializedComponents.get().add( src );
++                object.add( "with", context.serialize( src.getWith() ) );
++            }
++            finally {
++                ComponentSerializer.serializedComponents.get().remove( src );
++            }
+         }
+         return object;
+     }
+-- 
+2.11.0 (Apple Git-81)
+

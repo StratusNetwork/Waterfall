@@ -1,4 +1,4 @@
-From 33b3a7d1a87de3d28d3025bbd131060ad8461745 Mon Sep 17 00:00:00 2001
+From 1c58c865680b51bfc54031fa4422aa10513f4cda Mon Sep 17 00:00:00 2001
 From: cswhite2000 <18whitechristop@gmail.com>
 Date: Sat, 2 Sep 2017 16:42:10 -0700
 Subject: [PATCH] Make some packets extend MultiVersionPacket17
@@ -10,7 +10,7 @@ index 95ad39b7..1f78125a 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/Chat.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -23,12 +23,12 @@ index 95ad39b7..1f78125a 100644
 -public class Chat extends DefinedPacket
 +public class Chat extends MultiVersionPacketV17
  {
-
+ 
      private String message;
 @@ -24,6 +24,14 @@ public class Chat extends DefinedPacket
          this( message, (byte) 0 );
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -43,7 +43,7 @@ index 95ad39b7..1f78125a 100644
 @@ -34,6 +42,14 @@ public class Chat extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -61,7 +61,7 @@ index 5c79727c..431b2eb8 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/ClientSettings.java
 @@ -1,5 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import net.md_5.bungee.protocol.DefinedPacket;
  import io.netty.buffer.ByteBuf;
@@ -73,12 +73,12 @@ index 5c79727c..431b2eb8 100644
 -public class ClientSettings extends DefinedPacket
 +public class ClientSettings extends MultiVersionPacketV17
  {
-
+ 
      private String locale;
 @@ -24,6 +25,19 @@ public class ClientSettings extends DefinedPacket
      private byte skinParts;
      private int mainHand;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -98,7 +98,7 @@ index 5c79727c..431b2eb8 100644
 @@ -58,6 +72,19 @@ public class ClientSettings extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -121,7 +121,7 @@ index a29524ca..8d9f4ccb 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/EncryptionRequest.java
 @@ -1,25 +1,35 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
  import lombok.AllArgsConstructor;
@@ -131,7 +131,7 @@ index a29524ca..8d9f4ccb 100644
  import net.md_5.bungee.protocol.AbstractPacketHandler;
 -import net.md_5.bungee.protocol.DefinedPacket;
  import net.md_5.bungee.protocol.ProtocolConstants;
-
+ 
  @Data
  @NoArgsConstructor
  @AllArgsConstructor
@@ -139,11 +139,11 @@ index a29524ca..8d9f4ccb 100644
 -public class EncryptionRequest extends DefinedPacket
 +public class EncryptionRequest extends MultiVersionPacketV17
  {
-
+ 
      private String serverId;
      private byte[] publicKey;
      private byte[] verifyToken;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -160,7 +160,7 @@ index a29524ca..8d9f4ccb 100644
 @@ -28,6 +38,16 @@ public class EncryptionRequest extends DefinedPacket
          verifyToken = readArray( buf );
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -180,7 +180,7 @@ index 06676e42..19a85492 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/EncryptionResponse.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -193,10 +193,10 @@ index 06676e42..19a85492 100644
 -public class EncryptionResponse extends DefinedPacket
 +public class EncryptionResponse extends MultiVersionPacketV17
  {
-
+ 
      private byte[] sharedSecret;
      private byte[] verifyToken;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -212,7 +212,7 @@ index 06676e42..19a85492 100644
 @@ -26,6 +35,15 @@ public class EncryptionResponse extends DefinedPacket
          verifyToken = readArray( buf, 128 );
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -231,7 +231,7 @@ index 0960b7d8..253a3ecd 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/KeepAlive.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -244,9 +244,9 @@ index 0960b7d8..253a3ecd 100644
 -public class KeepAlive extends DefinedPacket
 +public class KeepAlive extends MultiVersionPacketV17
  {
-
+ 
      private int randomId;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -260,7 +260,7 @@ index 0960b7d8..253a3ecd 100644
      {
          randomId = readVarInt( buf );
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -278,7 +278,7 @@ index 9983ef2e..ae5dad52 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/PlayerListItem.java
 @@ -1,5 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import net.md_5.bungee.protocol.DefinedPacket;
  import io.netty.buffer.ByteBuf;
@@ -290,10 +290,10 @@ index 9983ef2e..ae5dad52 100644
 -public class PlayerListItem extends DefinedPacket
 +public class PlayerListItem extends MultiVersionPacketV17
  {
-
+ 
      private Action action;
      private Item[] items;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -312,7 +312,7 @@ index 9983ef2e..ae5dad52 100644
 @@ -73,6 +86,17 @@ public class PlayerListItem extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -332,7 +332,7 @@ index 6dcdece5..b3d806a2 100644
 --- a/protocol/src/main/java/net/md_5/bungee/protocol/packet/PluginMessage.java
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/PluginMessage.java
 @@ -2,7 +2,7 @@ package net.md_5.bungee.protocol.packet;
-
+ 
  import com.google.common.base.Preconditions;
  import com.google.common.base.Predicate;
 -import net.md_5.bungee.protocol.DefinedPacket;
@@ -347,12 +347,12 @@ index 6dcdece5..b3d806a2 100644
 -public class PluginMessage extends DefinedPacket
 +public class PluginMessage extends MultiVersionPacketV17
  {
-
+ 
      public static final Predicate<PluginMessage> SHOULD_RELAY = new Predicate<PluginMessage>()
 @@ -38,6 +38,15 @@ public class PluginMessage extends DefinedPacket
       */
      private boolean allowExtendedPacket = false;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -368,7 +368,7 @@ index 6dcdece5..b3d806a2 100644
 @@ -48,6 +57,15 @@ public class PluginMessage extends DefinedPacket
          buf.readBytes( data );
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -387,7 +387,7 @@ index ef9b8cf6..43af3189 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/ScoreboardObjective.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -400,12 +400,12 @@ index ef9b8cf6..43af3189 100644
 -public class ScoreboardObjective extends DefinedPacket
 +public class ScoreboardObjective extends MultiVersionPacketV17
  {
-
+ 
      private String name;
 @@ -24,6 +24,16 @@ public class ScoreboardObjective extends DefinedPacket
       */
      private byte action;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -422,7 +422,7 @@ index ef9b8cf6..43af3189 100644
 @@ -36,6 +46,16 @@ public class ScoreboardObjective extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -442,7 +442,7 @@ index 6f0de535..b967f89f 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/ScoreboardScore.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -455,12 +455,12 @@ index 6f0de535..b967f89f 100644
 -public class ScoreboardScore extends DefinedPacket
 +public class ScoreboardScore extends MultiVersionPacketV17
  {
-
+ 
      private String itemName;
 @@ -24,6 +24,20 @@ public class ScoreboardScore extends DefinedPacket
      private String scoreName;
      private int value;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -481,7 +481,7 @@ index 6f0de535..b967f89f 100644
 @@ -36,6 +50,20 @@ public class ScoreboardScore extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -505,7 +505,7 @@ index e3bcbc33..7634ebfd 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/TabCompleteRequest.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -518,12 +518,12 @@ index e3bcbc33..7634ebfd 100644
 -public class TabCompleteRequest extends DefinedPacket
 +public class TabCompleteRequest extends MultiVersionPacketV17
  {
-
+ 
      private String cursor;
 @@ -21,6 +21,14 @@ public class TabCompleteRequest extends DefinedPacket
      private boolean hasPositon;
      private long position;
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -538,7 +538,7 @@ index e3bcbc33..7634ebfd 100644
 @@ -36,6 +44,14 @@ public class TabCompleteRequest extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -556,7 +556,7 @@ index b4705799..da1066cc 100644
 +++ b/protocol/src/main/java/net/md_5/bungee/protocol/packet/Team.java
 @@ -1,6 +1,6 @@
  package net.md_5.bungee.protocol.packet;
-
+ 
 -import net.md_5.bungee.protocol.DefinedPacket;
 +import io.github.waterfallmc.travertine.protocol.MultiVersionPacketV17;
  import io.netty.buffer.ByteBuf;
@@ -569,12 +569,12 @@ index b4705799..da1066cc 100644
 -public class Team extends DefinedPacket
 +public class Team extends MultiVersionPacketV17
  {
-
+ 
      private String name;
 @@ -39,6 +39,31 @@ public class Team extends DefinedPacket
          this.mode = 1;
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Read(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)
@@ -606,7 +606,7 @@ index b4705799..da1066cc 100644
 @@ -68,6 +93,30 @@ public class Team extends DefinedPacket
          }
      }
-
+ 
 +    // Travertine start
 +    @Override
 +    public void v17Write(ByteBuf buf, ProtocolConstants.Direction direction, int protocolVersion)

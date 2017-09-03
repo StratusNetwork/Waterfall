@@ -1,0 +1,230 @@
+From 560be0c0826147bc7f744bccb84fb1a1d2ba2d30 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 24 Jan 2016 18:52:29 -0500
+Subject: [PATCH] Safe dynamic modification of the server list
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/ProxyConfig.java b/api/src/main/java/net/md_5/bungee/api/ProxyConfig.java
+index edd82c1e..7f405b91 100644
+--- a/api/src/main/java/net/md_5/bungee/api/ProxyConfig.java
++++ b/api/src/main/java/net/md_5/bungee/api/ProxyConfig.java
+@@ -32,10 +32,76 @@ public interface ProxyConfig
+ 
+     /**
+      * Set of all servers.
++     *
++     * @deprecated The returned map may be modified concurrently by the proxy.
++     *             The safe alternative is {@link #getServersCopy()}.
+      */
++    @Deprecated
+     Map<String, ServerInfo> getServers();
+ 
+     /**
++     * Return all servers registered to this proxy, keyed by name. The returned map
++     * is an immutable snapshot of the actual server collection. It cannot be modified,
++     * and it will not change.
++     *
++     * @return all registered remote server destinations
++     */
++    Map<String, ServerInfo> getServersCopy();
++
++    /**
++     * Gets the server info of a server.
++     *
++     * @param name the name of the configured server
++     * @return the server info belonging to the specified server
++     */
++    ServerInfo getServerInfo(String name);
++
++    /**
++     * Register the given server to the proxy.
++     * Any currently registered server with the same name will be replaced.
++     *
++     * @return the previously registered server with the same name, or null if there was no such server.
++     */
++    ServerInfo addServer(ServerInfo server);
++
++    /**
++     * Register all of the given servers to the proxy.
++     *
++     * @return true if any servers were added or replaced.
++     */
++    boolean addServers(Collection<ServerInfo> servers);
++
++    /**
++     * Un-register the server with the given name from the proxy.
++     *
++     * @return the server that was removed, or null if there is no server with the given name.
++     */
++    ServerInfo removeServerNamed(String name);
++
++    /**
++     * Un-register the given server from the proxy.
++     * The server is matched by name only, other fields in the given {@link ServerInfo} are ignored.
++     *
++     * @return the server that was removed, or null if there is no server with a matching name.
++     */
++    ServerInfo removeServer(ServerInfo server);
++
++    /**
++     * Un-register servers with any of the given names from the proxy.
++     *
++     * @return true if any servers were removed.
++     */
++    boolean removeServersNamed(Collection<String> names);
++
++    /**
++     * Un-register all of the given servers from the proxy.
++     * The servers are matched by name only, other fields in the given {@link ServerInfo} are ignored.
++     *
++     * @return true if any servers were removed.
++     */
++    boolean removeServers(Collection<ServerInfo> servers);
++
++    /**
+      * Does the server authenticate with mojang
+      */
+     boolean isOnlineMode();
+diff --git a/api/src/main/java/net/md_5/bungee/api/ProxyServer.java b/api/src/main/java/net/md_5/bungee/api/ProxyServer.java
+index 11c5b685..20e2045d 100644
+--- a/api/src/main/java/net/md_5/bungee/api/ProxyServer.java
++++ b/api/src/main/java/net/md_5/bungee/api/ProxyServer.java
+@@ -93,10 +93,24 @@ public abstract class ProxyServer
+      * return a fresh map each time.
+      *
+      * @return all registered remote server destinations
++     *
++     * @deprecated The returned map is part of the proxy's internal state,
++     *             and may be modified concurrently by the proxy.
++     *             The safe alternative is {@link #getServersCopy()}.
+      */
++    @Deprecated
+     public abstract Map<String, ServerInfo> getServers();
+ 
+     /**
++     * Return all servers registered to this proxy, keyed by name. The returned map
++     * is an immutable snapshot of the actual server collection. It cannot be modified,
++     * and it will not change.
++     *
++     * @return all registered remote server destinations
++     */
++    public abstract Map<String, ServerInfo> getServersCopy();
++
++    /**
+      * Gets the server info of a server.
+      *
+      * @param name the name of the configured server
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index d24ce4b2..4a276b82 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -572,9 +572,15 @@ public class BungeeCord extends ProxyServer
+     }
+ 
+     @Override
++    public Map<String, ServerInfo> getServersCopy()
++    {
++        return config.getServersCopy();
++    }
++
++    @Override
+     public ServerInfo getServerInfo(String name)
+     {
+-        return getServers().get( name );
++        return config.getServerInfo( name );
+     }
+ 
+     @Override
+diff --git a/proxy/src/main/java/net/md_5/bungee/conf/Configuration.java b/proxy/src/main/java/net/md_5/bungee/conf/Configuration.java
+index 907246a9..1e1557b4 100644
+--- a/proxy/src/main/java/net/md_5/bungee/conf/Configuration.java
++++ b/proxy/src/main/java/net/md_5/bungee/conf/Configuration.java
+@@ -1,6 +1,7 @@
+ package net.md_5.bungee.conf;
+ 
+ import com.google.common.base.Preconditions;
++import com.google.common.collect.ImmutableMap;
+ import gnu.trove.map.TMap;
+ import java.io.File;
+ import java.io.IOException;
+@@ -11,6 +12,7 @@ import java.util.UUID;
+ import java.util.logging.Level;
+ import javax.imageio.ImageIO;
+ import lombok.Getter;
++import lombok.Synchronized;
+ import net.md_5.bungee.api.Favicon;
+ import net.md_5.bungee.api.ProxyConfig;
+ import net.md_5.bungee.api.ProxyServer;
+@@ -144,4 +146,69 @@ public class Configuration implements ProxyConfig
+     {
+         return favicon;
+     }
++
++    @Override
++    @Synchronized("servers")
++    public Map<String, ServerInfo> getServersCopy() {
++        return ImmutableMap.copyOf( servers );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public ServerInfo getServerInfo(String name)
++    {
++        return this.servers.get( name );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public ServerInfo addServer(ServerInfo server)
++    {
++        return this.servers.put( server.getName(), server );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public boolean addServers(Collection<ServerInfo> servers)
++    {
++        boolean changed = false;
++        for ( ServerInfo server : servers )
++        {
++            if ( server != this.servers.put( server.getName(), server ) ) changed = true;
++        }
++        return changed;
++    }
++
++    @Override
++    @Synchronized("servers")
++    public ServerInfo removeServerNamed(String name)
++    {
++        return this.servers.remove( name );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public ServerInfo removeServer(ServerInfo server)
++    {
++        return this.servers.remove( server.getName() );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public boolean removeServersNamed(Collection<String> names)
++    {
++        return this.servers.keySet().removeAll( names );
++    }
++
++    @Override
++    @Synchronized("servers")
++    public boolean removeServers(Collection<ServerInfo> servers)
++    {
++        boolean changed = false;
++        for ( ServerInfo server : servers )
++        {
++            if ( null != this.servers.remove( server.getName() ) ) changed = true;
++        }
++        return changed;
++    }
+ }
+-- 
+2.11.0 (Apple Git-81)
+

@@ -1,0 +1,102 @@
+From d8266240c60d0e601bd9f71dd4e8cdf15cfaaad9 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Fri, 3 Jun 2016 01:50:15 -0400
+Subject: [PATCH] A few helpful methods for converting between components and
+ legacy text
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+index e48cf9b4..38533d93 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+@@ -107,6 +107,14 @@ public abstract class BaseComponent
+      */
+     public abstract BaseComponent duplicate();
+ 
++    public static String[] toLegacyArray(BaseComponent... components) {
++        final String[] legacies = new String[components.length];
++        for(int i = 0; i < components.length; i++) {
++            legacies[i] = components[i].toLegacyText();
++        }
++        return legacies;
++    }
++
+     /**
+      * Converts the components to a string that uses the old formatting codes
+      * ({@link net.md_5.bungee.api.ChatColor#COLOR_CHAR}
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+index b96bb2eb..185fb762 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+@@ -22,6 +22,14 @@ public class TextComponent extends BaseComponent
+ 
+     private static final Pattern url = Pattern.compile( "^(?:(https?)://)?([-\\w_\\.]{2,}\\.[a-z]{2,4})(/\\S*)?$" );
+ 
++    public static BaseComponent[] fromLegacyArray(String[] legacies, boolean autolink) {
++        final BaseComponent[] components = new BaseComponent[legacies.length];
++        for(int i = 0; i < legacies.length; i++) {
++            components[i] = fromLegacyToComponent(legacies[i], autolink);
++        }
++        return components;
++    }
++
+     /**
+      * Calls {@link #fromLegacyText(String, boolean)} with autolink true
+      */
+@@ -38,7 +46,7 @@ public class TextComponent extends BaseComponent
+      * @param autolink detect links and make them clickable
+      * @return the components needed to print the message to the client
+      */
+-    public static BaseComponent[] fromLegacyText(String message, boolean autolink)
++    public static List<BaseComponent> fromLegacyToList(String message, boolean autolink)
+     {
+         ArrayList<BaseComponent> components = new ArrayList<BaseComponent>();
+         StringBuilder builder = new StringBuilder();
+@@ -135,6 +143,12 @@ public class TextComponent extends BaseComponent
+             components.add( component );
+         }
+ 
++        return components;
++    }
++
++    public static BaseComponent[] fromLegacyText(String message, boolean autolink) {
++        final List<BaseComponent> components = fromLegacyToList(message, autolink);
++
+         // The client will crash if the array is empty
+         if ( components.isEmpty() )
+         {
+@@ -144,6 +158,15 @@ public class TextComponent extends BaseComponent
+         return components.toArray( new BaseComponent[ components.size() ] );
+     }
+ 
++    public static BaseComponent fromLegacyToComponent(String message, boolean autolink) {
++        final List<BaseComponent> components = fromLegacyToList(message, autolink);
++        switch(components.size()) {
++            case 0: return new TextComponent();
++            case 1: return components.get(0);
++            default: return new TextComponent(components);
++        }
++    }
++
+     /**
+      * The text of the component that will be displayed to the client
+      */
+@@ -180,6 +203,15 @@ public class TextComponent extends BaseComponent
+         setExtra( extras );
+     }
+ 
++    public TextComponent(List<BaseComponent> extra) {
++        this("", extra);
++    }
++
++    public TextComponent(String text, List<BaseComponent> extra) {
++        setText(text);
++        setExtra(extra);
++    }
++
+     /**
+      * Creates a duplicate of this TextComponent.
+      *
+-- 
+2.11.0 (Apple Git-81)
+

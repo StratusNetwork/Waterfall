@@ -1,0 +1,25 @@
+From 3596cad7e63fafea96156422639b9295dde518c2 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Sun, 20 Nov 2016 07:55:13 -0500
+Subject: [PATCH] Show disconnect exception messages
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index e4e2604c..beea8e89 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -334,9 +334,9 @@ public final class UserConnection implements ProxiedPlayer
+                         connect( def, null, true );
+                     } else if ( dimensionChange )
+                     {
+-                        disconnect( bungee.getTranslation( "fallback_kick", future.cause().getClass().getName() ) );
++                        disconnect( bungee.getTranslation( "fallback_kick", future.cause().toString() ) );
+                     } else if(!quiet) {
+-                        sendMessage( bungee.getTranslation( "fallback_kick", future.cause().getClass().getName() ) );
++                        sendMessage( bungee.getTranslation( "fallback_kick", future.cause().toString() ) );
+                     }
+                 }
+             }
+-- 
+2.11.0 (Apple Git-81)
+

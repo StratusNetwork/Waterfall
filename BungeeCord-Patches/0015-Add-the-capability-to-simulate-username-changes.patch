@@ -1,0 +1,71 @@
+From 662a7fdb550ad167c137aadcd4b17adc061dc189 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Tue, 6 Jan 2015 11:24:09 -0500
+Subject: [PATCH] Add the capability to simulate username changes
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/event/ServerConnectEvent.java b/api/src/main/java/net/md_5/bungee/api/event/ServerConnectEvent.java
+index 17cfccd0..51824022 100644
+--- a/api/src/main/java/net/md_5/bungee/api/event/ServerConnectEvent.java
++++ b/api/src/main/java/net/md_5/bungee/api/event/ServerConnectEvent.java
+@@ -34,6 +34,7 @@ public class ServerConnectEvent extends Event implements Cancellable
+      * Cancelled state.
+      */
+     private boolean cancelled;
++    private String fakeUsername;
+ 
+     public ServerConnectEvent(ProxiedPlayer player, ServerInfo target)
+     {
+diff --git a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
+index d5e038ef..eb9fd3e3 100644
+--- a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
++++ b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
+@@ -36,6 +36,7 @@ import net.md_5.bungee.protocol.packet.EncryptionRequest;
+ import net.md_5.bungee.protocol.packet.Handshake;
+ import net.md_5.bungee.protocol.packet.Kick;
+ import net.md_5.bungee.protocol.packet.Login;
++import net.md_5.bungee.protocol.packet.LoginRequest;
+ import net.md_5.bungee.protocol.packet.LoginSuccess;
+ import net.md_5.bungee.protocol.packet.PluginMessage;
+ import net.md_5.bungee.protocol.packet.Respawn;
+@@ -52,6 +53,7 @@ public class ServerConnector extends PacketHandler
+     private final UserConnection user;
+     private final BungeeServerInfo target;
+     private State thisState = State.LOGIN_SUCCESS;
++    private final String fakeUsername;
+     @Getter
+     private ForgeServerHandler handshakeHandler;
+     private boolean obsolete;
+@@ -109,7 +111,7 @@ public class ServerConnector extends PacketHandler
+         channel.write( copiedHandshake );
+ 
+         channel.setProtocol( Protocol.LOGIN );
+-        channel.write( user.getPendingConnection().getLoginRequest() );
++        channel.write(new LoginRequest(fakeUsername != null ? fakeUsername : user.getPendingConnection().getName()));
+     }
+ 
+     @Override
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index 072a3108..188db1e7 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -262,6 +262,7 @@ public final class UserConnection implements ProxiedPlayer
+         }
+ 
+         final BungeeServerInfo target = (BungeeServerInfo) event.getTarget(); // Update in case the event changed target
++        final String fakeUsername = event.getFakeUsername();
+ 
+         if ( getServer() != null && Objects.equal( getServer().getInfo(), target ) )
+         {
+@@ -294,7 +295,7 @@ public final class UserConnection implements ProxiedPlayer
+                 PipelineUtils.BASE.initChannel( ch );
+                 ch.pipeline().addAfter( PipelineUtils.FRAME_DECODER, PipelineUtils.PACKET_DECODER, new MinecraftDecoder( Protocol.HANDSHAKE, false, getPendingConnection().getVersion() ) );
+                 ch.pipeline().addAfter( PipelineUtils.FRAME_PREPENDER, PipelineUtils.PACKET_ENCODER, new MinecraftEncoder( Protocol.HANDSHAKE, false, getPendingConnection().getVersion() ) );
+-                ch.pipeline().get( HandlerBoss.class ).setHandler( new ServerConnector( bungee, UserConnection.this, target ) );
++                ch.pipeline().get( HandlerBoss.class ).setHandler( new ServerConnector( bungee, UserConnection.this, target, fakeUsername ) );
+             }
+         };
+         ChannelFutureListener listener = new ChannelFutureListener()
+-- 
+2.11.0 (Apple Git-81)
+

@@ -1,0 +1,85 @@
+From f4694e7d0c2f4cc166698d98c4999f59b053ff7c Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 2 Jun 2016 22:05:37 -0400
+Subject: [PATCH] Add quiet connect plugin channel message
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/UserConnection.java b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+index 1e4128eb..526bc28c 100644
+--- a/proxy/src/main/java/net/md_5/bungee/UserConnection.java
++++ b/proxy/src/main/java/net/md_5/bungee/UserConnection.java
+@@ -242,7 +242,11 @@ public final class UserConnection implements ProxiedPlayer
+         return next;
+     }
+ 
+-    public void connect(ServerInfo info, final Callback<Boolean> callback, final boolean retry)
++    public void connect(ServerInfo info, final Callback<Boolean> callback, final boolean retry) {
++        connect(info, callback, retry, false);
++    }
++
++    public void connect(ServerInfo info, final Callback<Boolean> callback, final boolean retry, final boolean quiet)
+     {
+         Preconditions.checkNotNull( info, "info" );
+ 
+@@ -271,7 +275,9 @@ public final class UserConnection implements ProxiedPlayer
+                 callback.done( false, null );
+             }
+ 
+-            sendMessage( bungee.getTranslation( "already_connected" ) );
++            if(!quiet) {
++                sendMessage( bungee.getTranslation( "already_connected" ) );
++            }
+             return;
+         }
+         if ( pendingConnects.contains( target ) )
+@@ -281,7 +287,9 @@ public final class UserConnection implements ProxiedPlayer
+                 callback.done( false, null );
+             }
+ 
+-            sendMessage( bungee.getTranslation( "already_connecting" ) );
++            if(!quiet) {
++                sendMessage( bungee.getTranslation( "already_connecting" ) );
++            }
+             return;
+         }
+ 
+@@ -317,13 +325,14 @@ public final class UserConnection implements ProxiedPlayer
+                     ServerInfo def = updateAndGetNextServer( target );
+                     if ( retry && def != null && ( getServer() == null || def != getServer().getInfo() ) )
+                     {
+-                        sendMessage( bungee.getTranslation( "fallback_lobby" ) );
++                        if(!quiet) {
++                            sendMessage( bungee.getTranslation( "fallback_lobby" ) );
++                        }
+                         connect( def, null, true );
+                     } else if ( dimensionChange )
+                     {
+                         disconnect( bungee.getTranslation( "fallback_kick", future.cause().getClass().getName() ) );
+-                    } else
+-                    {
++                    } else if(!quiet) {
+                         sendMessage( bungee.getTranslation( "fallback_kick", future.cause().getClass().getName() ) );
+                     }
+                 }
+diff --git a/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java b/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
+index dcea2d12..a8c737d1 100644
+--- a/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
++++ b/proxy/src/main/java/net/md_5/bungee/connection/DownstreamBridge.java
+@@ -341,6 +341,14 @@ public class DownstreamBridge extends PacketHandler
+                     con.connect( server );
+                 }
+             }
++            if ( subChannel.equals( "ConnectQuiet" ) )
++            {
++                ServerInfo server = bungee.getServerInfo( in.readUTF() );
++                if ( server != null )
++                {
++                    con.connect( server, null, false, true );
++                }
++            }
+             if ( subChannel.equals( "ConnectOther" ) )
+             {
+                 ProxiedPlayer player = bungee.getPlayer( in.readUTF() );
+-- 
+2.11.0 (Apple Git-81)
+

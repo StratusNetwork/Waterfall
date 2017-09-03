@@ -1,0 +1,135 @@
+From 00f3c110644698fa94f86a6dd9fd700e71af15a1 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 26 Jan 2017 22:51:00 -0500
+Subject: [PATCH] Changes needed for PGM's API layer
+
+
+diff --git a/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java b/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
+index f2b68e42..1710407d 100644
+--- a/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
++++ b/api/src/main/java/net/md_5/bungee/api/plugin/Plugin.java
+@@ -34,6 +34,8 @@ public class Plugin implements tc.oc.minecraft.api.plugin.Plugin
+     @Getter
+     private Logger logger;
+ 
++    private boolean enabled;
++
+     @Inject private Injector injector;
+     @Inject private ExceptionHandler exceptionHandler;
+     @Inject private EventRegistry eventRegistry;
+@@ -63,12 +65,22 @@ public class Plugin implements tc.oc.minecraft.api.plugin.Plugin
+         return eventRegistry;
+     }
+ 
++    @Override
++    public boolean isEnabled() {
++        return enabled;
++    }
++
+     public final void preEnable() {
++        enabled = true;
+         listenerContext.get().enable();
+     }
+ 
+     public final void postDisable() {
+-        listenerContext.get().disable();
++        try {
++            listenerContext.get().disable();
++        } finally {
++            enabled = false;
++        }
+     }
+ 
+     /**
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 4dc54879..c22eb275 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -24,6 +24,8 @@ import java.io.FileReader;
+ import java.io.IOException;
+ import java.io.PrintStream;
+ import java.net.InetSocketAddress;
++import java.nio.file.Path;
++import java.nio.file.Paths;
+ import java.text.MessageFormat;
+ import java.util.Collection;
+ import java.util.Collections;
+@@ -39,6 +41,7 @@ import java.util.Timer;
+ import java.util.TimerTask;
+ import java.util.UUID;
+ import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicBoolean;
+ import java.util.concurrent.locks.ReadWriteLock;
+ import java.util.concurrent.locks.ReentrantReadWriteLock;
+ import java.util.logging.Handler;
+@@ -103,6 +106,7 @@ public class BungeeCord extends ProxyServer
+      * Current operation state.
+      */
+     public volatile boolean isRunning;
++    private final AtomicBoolean isStopping = new AtomicBoolean(false);
+     /**
+      * Configuration.
+      */
+@@ -143,6 +147,7 @@ public class BungeeCord extends ProxyServer
+     @Setter
+     private ConfigurationAdapter configurationAdapter = new YamlConfig();
+     private final Collection<String> pluginChannels = new HashSet<>();
++    private final Path rootFolder;
+     @Getter
+     private final File pluginsFolder = new File( "plugins" );
+     @Getter
+@@ -185,6 +190,8 @@ public class BungeeCord extends ProxyServer
+         // Overcast - disable security manager
+         // System.setSecurityManager( new BungeeSecurityManager() );
+ 
++        this.rootFolder = Paths.get(".").toAbsolutePath();
++
+         try
+         {
+             baseBundle = ResourceBundle.getBundle( "messages" );
+@@ -380,6 +387,11 @@ public class BungeeCord extends ProxyServer
+     }
+ 
+     @Override
++    public boolean isStopping() {
++        return isStopping.get();
++    }
++
++    @Override
+     public void stop()
+     {
+         stop( getTranslation( "restart" ) );
+@@ -388,6 +400,8 @@ public class BungeeCord extends ProxyServer
+     @Override
+     public void stop(final String reason)
+     {
++        if(!isStopping.compareAndSet(false, true)) return;
++
+         new Thread( "Shutdown Thread" )
+         {
+             @Override
+@@ -484,6 +498,21 @@ public class BungeeCord extends ProxyServer
+     }
+ 
+     @Override
++    public Path getRootPath() {
++        return rootFolder;
++    }
++
++    @Override
++    public InetSocketAddress getAddress() {
++        return getConfig().getListeners().iterator().next().getHost();
++    }
++
++    @Override
++    public int getMaxPlayers() {
++        return getConfig().getPlayerLimit();
++    }
++
++    @Override
+     public String getTranslation(String name, Object... args)
+     {
+         String translation = "<translation '" + name + "' missing>";
+-- 
+2.11.0 (Apple Git-81)
+

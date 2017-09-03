@@ -1,0 +1,22 @@
+From 5fdfbd9b357694a14d4e2180660803efad08b20e Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Mon, 22 Dec 2014 12:37:59 -0500
+Subject: [PATCH] Remove startup delay for outdated build
+
+
+diff --git a/bootstrap/src/main/java/net/md_5/bungee/BungeeCordLauncher.java b/bootstrap/src/main/java/net/md_5/bungee/BungeeCordLauncher.java
+index 3c1bbe93..d811ea16 100644
+--- a/bootstrap/src/main/java/net/md_5/bungee/BungeeCordLauncher.java
++++ b/bootstrap/src/main/java/net/md_5/bungee/BungeeCordLauncher.java
+@@ -44,8 +44,6 @@ public class BungeeCordLauncher
+                 System.err.println( "*** Warning, this build is outdated ***" );
+                 System.err.println( "*** Please download a new build from http://ci.md-5.net/job/BungeeCord ***" );
+                 System.err.println( "*** You will get NO support regarding this build ***" );
+-                System.err.println( "*** Server will start in 10 seconds ***" );
+-                Thread.sleep( TimeUnit.SECONDS.toMillis( 10 ) );
+             }
+         }
+ 
+-- 
+2.11.0 (Apple Git-81)
+

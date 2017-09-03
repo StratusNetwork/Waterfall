@@ -1,0 +1,626 @@
+From 5bd0117f245f7854f74c27f56a268b841eb6c57e Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Wed, 6 Jul 2016 02:31:22 -0400
+Subject: [PATCH] Handle default colors better when converting to/from legacy
+ text
+
+
+diff --git a/chat/src/main/java/net/md_5/bungee/api/ChatColor.java b/chat/src/main/java/net/md_5/bungee/api/ChatColor.java
+index 85291a88..e216abf8 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/ChatColor.java
++++ b/chat/src/main/java/net/md_5/bungee/api/ChatColor.java
+@@ -2,7 +2,10 @@ package net.md_5.bungee.api;
+ 
+ import java.util.HashMap;
+ import java.util.Map;
++import java.util.Set;
+ import java.util.regex.Pattern;
++
++import com.google.common.collect.ImmutableSet;
+ import lombok.Getter;
+ 
+ /**
+@@ -106,13 +109,13 @@ public enum ChatColor
+     public static final char COLOR_CHAR = '\u00A7';
+     public static final String ALL_CODES = "0123456789AaBbCcDdEeFfKkLlMmNnOoRr";
+ 
+-    public static final ChatColor[] DECORATIONS = {
++    public static final Set<ChatColor> DECORATIONS = ImmutableSet.of(
+         BOLD,
+         ITALIC,
+         UNDERLINE,
+         STRIKETHROUGH,
+         MAGIC
+-    };
++    );
+ 
+     /**
+      * Pattern to remove all colour codes.
+@@ -157,6 +160,14 @@ public enum ChatColor
+         return toString;
+     }
+ 
++    public boolean isColor() {
++        return this == RESET || (code >= '0' && code <= 'f');
++    }
++
++    public boolean isDecoration() {
++        return DECORATIONS.contains(this);
++    }
++
+     /**
+      * Strips the given message of all color codes
+      *
+diff --git a/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java b/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
+index bcd53d31..ac7990b3 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
++++ b/chat/src/main/java/net/md_5/bungee/api/ChatStringBuilder.java
+@@ -2,15 +2,17 @@ package net.md_5.bungee.api;
+ 
+ import java.util.EnumSet;
+ import java.util.Set;
++import javax.annotation.Nullable;
+ 
+ public class ChatStringBuilder implements Appendable {
+ 
+     private final StringBuilder builder;
+-    private ChatColor oldColor, newColor;
++    private @Nullable ChatColor oldColor, newColor;
+     private final Set<ChatColor> oldDecorations, newDecorations;
+     private boolean formatChanged = true;
++    private boolean colored = false;
+ 
+-    public ChatStringBuilder(String initial, ChatColor color, Set<ChatColor> decorations) {
++    public ChatStringBuilder(String initial, @Nullable ChatColor color, Set<ChatColor> decorations) {
+         builder = initial != null ? new StringBuilder(initial) : new StringBuilder();
+ 
+         oldColor = newColor = color;
+@@ -20,7 +22,7 @@ public class ChatStringBuilder implements Appendable {
+     }
+ 
+     public ChatStringBuilder() {
+-        this(null, ChatColor.RESET, null);
++        this(null, null, null);
+     }
+ 
+     @Override
+@@ -29,6 +31,11 @@ public class ChatStringBuilder implements Appendable {
+     }
+ 
+     private void refreshComplete() {
++        if(newColor == null) {
++            newColor = ChatColor.RESET;
++        }
++
++        colored = true;
+         builder.append(oldColor = newColor);
+ 
+         oldDecorations.clear();
+@@ -92,7 +99,12 @@ public class ChatStringBuilder implements Appendable {
+         append(String.valueOf(thing));
+     }
+ 
+-    public void color(ChatColor color) {
++    public void color(@Nullable ChatColor color) {
++        if(colored && color == null) {
++            // Cannot un-color a legacy string
++            color = ChatColor.RESET;
++        }
++
+         if(newColor != color) {
+             formatChanged = true;
+             newColor = color;
+@@ -117,7 +129,7 @@ public class ChatStringBuilder implements Appendable {
+         }
+     }
+ 
+-    public void format(ChatColor color, Set<ChatColor> decorations) {
++    public void format(@Nullable ChatColor color, Set<ChatColor> decorations) {
+         color(color);
+         decorations(decorations);
+     }
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+index 38533d93..cd1cdb79 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/BaseComponent.java
+@@ -3,6 +3,7 @@ package net.md_5.bungee.api.chat;
+ import com.google.common.base.Joiner;
+ import com.google.common.base.Objects;
+ import com.google.common.base.Preconditions;
++import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Lists;
+ import lombok.Getter;
+ import lombok.NoArgsConstructor;
+@@ -17,6 +18,7 @@ import java.util.EnumSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
++import javax.annotation.Nullable;
+ 
+ @Setter
+ @NoArgsConstructor
+@@ -115,6 +117,10 @@ public abstract class BaseComponent
+         return legacies;
+     }
+ 
++    public static String toLegacyText(BaseComponent... components) {
++        return toLegacyText(null, ImmutableSet.<ChatColor>of(), components);
++    }
++
+     /**
+      * Converts the components to a string that uses the old formatting codes
+      * ({@link net.md_5.bungee.api.ChatColor#COLOR_CHAR}
+@@ -122,12 +128,12 @@ public abstract class BaseComponent
+      * @param components the components to convert
+      * @return the string in the old format
+      */
+-    public static String toLegacyText(BaseComponent... components)
++    public static String toLegacyText(@Nullable ChatColor color, Set<ChatColor> decorations, BaseComponent... components)
+     {
+         StringBuilder builder = new StringBuilder();
+         for ( BaseComponent msg : components )
+         {
+-            builder.append( msg.toLegacyText() );
++            builder.append( msg.toLegacyText(color, decorations) );
+         }
+         return builder.toString();
+     }
+@@ -149,9 +155,8 @@ public abstract class BaseComponent
+     }
+ 
+     /**
+-     * Returns the color of this component. This uses the parent's color if this
+-     * component doesn't have one. {@link net.md_5.bungee.api.ChatColor#WHITE}
+-     * is returned if no color is found.
++     * Returns the color of this component, or {@link net.md_5.bungee.api.ChatColor#WHITE}
++     * if this component has no color.
+      *
+      * @return the color of this component
+      */
+@@ -161,8 +166,7 @@ public abstract class BaseComponent
+     }
+ 
+     /**
+-     * Returns the color of this component without checking the parents color.
+-     * May return null
++     * Returns the color of this component, or null if this component has no color.
+      *
+      * @return the color of this component
+      */
+@@ -175,6 +179,11 @@ public abstract class BaseComponent
+         return color != null ? color : def;
+     }
+ 
++    public void setColor(@Nullable ChatColor color) {
++        Preconditions.checkArgument(color == null || color.isColor(), "not a color");
++        this.color = color;
++    }
++
+     /**
+      * Returns whether this component is bold. This uses the parent's setting if
+      * this component hasn't been set. false is returned if none of the parent
+@@ -390,19 +399,43 @@ public abstract class BaseComponent
+     }
+ 
+     /**
+-     * Converts the component to a string that uses the old formatting codes
+-     * ({@link net.md_5.bungee.api.ChatColor#COLOR_CHAR}
++     * Calls {@link #toLegacyText(ChatColor, Set)} with no default color or decorations.
++     */
++    public String toLegacyText() {
++        return toLegacyText(null, ImmutableSet.<ChatColor>of());
++    }
++
++    public String toLegacyText(@Nullable ChatColor color, ChatColor... decorations) {
++        return toLegacyText(color, ImmutableSet.copyOf(decorations));
++    }
++
++    /**
++     * Converts the component to a string that uses the old formatting codes {@link net.md_5.bungee.api.ChatColor#COLOR_CHAR}
++     *
++     * Any given default color or decorations will be applied as if they were inherited from a parent component.
++     * Any part of the string that is not formatted by some component in this tree will have the default formatting
++     * applied.
++     *
++     * If null is given as the default color, then no color is applied to the returned string other than from
++     * the components. This is only possible up to the first formatting applied by a component (because formatting
++     * cannot be "removed" in legacy text, only replaced). Any default-formatted text after that will be given
++     * the {@link ChatColor#RESET} format, which can also be the color passed to this method.
++     *
++     * @param color         Default color, or {@link ChatColor#RESET}, or null for no default
++     * @param decorations   Default decorations
+      *
+      * @return the string in the old format
+      */
+-    public String toLegacyText()
++    public String toLegacyText(@Nullable ChatColor color, Set<ChatColor> decorations)
+     {
++        Preconditions.checkArgument(color == null || color.isColor(), "default color cannot be a decoration");
++
+         ChatStringBuilder builder = new ChatStringBuilder();
+-        toLegacyText(builder, ChatColor.WHITE, Collections.<ChatColor>emptySet());
++        toLegacyText(builder, color, decorations);
+         return builder.toString();
+     }
+ 
+-    protected void toLegacyText(ChatStringBuilder builder, ChatColor color, Set<ChatColor> decorations)
++    protected void toLegacyText(ChatStringBuilder builder, @Nullable ChatColor color, Set<ChatColor> decorations)
+     {
+         color = getColor(color);
+         decorations = getDecorations(decorations);
+@@ -418,7 +451,7 @@ public abstract class BaseComponent
+         }
+     }
+ 
+-    protected void toLegacyTextContent(ChatStringBuilder builder, ChatColor color, Set<ChatColor> decorations) {
++    protected void toLegacyTextContent(ChatStringBuilder builder, @Nullable ChatColor color, Set<ChatColor> decorations) {
+     }
+ 
+     protected static final Joiner JOINER = Joiner.on(", ");
+diff --git a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+index 185fb762..7cf4e5b0 100644
+--- a/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
++++ b/chat/src/main/java/net/md_5/bungee/api/chat/TextComponent.java
+@@ -52,69 +52,18 @@ public class TextComponent extends BaseComponent
+         StringBuilder builder = new StringBuilder();
+         TextComponent component = new TextComponent();
+         Matcher matcher = url.matcher( message );
++        boolean formatting = false;
+ 
+         for ( int i = 0; i < message.length(); i++ )
+         {
+-            char c = message.charAt( i );
+-            if ( c == ChatColor.COLOR_CHAR )
+-            {
+-                i++;
+-                c = message.charAt( i );
+-                if ( c >= 'A' && c <= 'Z' )
+-                {
+-                    c += 32;
+-                }
+-                ChatColor format = ChatColor.getByChar( c );
+-                if ( format == null )
+-                {
+-                    continue;
+-                }
+-                if ( builder.length() > 0 )
+-                {
+-                    TextComponent old = component;
+-                    component = new TextComponent( old );
+-                    old.setText( builder.toString() );
+-                    builder = new StringBuilder();
+-                    components.add( old );
+-                }
+-                switch ( format )
+-                {
+-                    case BOLD:
+-                        component.setBold( true );
+-                        break;
+-                    case ITALIC:
+-                        component.setItalic( true );
+-                        break;
+-                    case UNDERLINE:
+-                        component.setUnderlined( true );
+-                        break;
+-                    case STRIKETHROUGH:
+-                        component.setStrikethrough( true );
+-                        break;
+-                    case MAGIC:
+-                        component.setObfuscated( true );
+-                        break;
+-                    case RESET:
+-                        format = ChatColor.WHITE;
+-                    default:
+-                        component = new TextComponent();
+-                        component.setColor( format );
+-                        break;
+-                }
+-                continue;
+-            }
+-
+-            if(autolink) {
+-                int pos = message.indexOf( ' ', i );
+-                if ( pos == -1 )
+-                {
+-                    pos = message.length();
+-                }
+-                if ( matcher.region( i, pos ).find() )
+-                { //Web link handling
+-
+-                    if ( builder.length() > 0 )
+-                    {
++            final char c = message.charAt( i );
++            if(c == ChatColor.COLOR_CHAR) {
++                formatting = true;
++            } else if(formatting) {
++                formatting = false;
++                final ChatColor format = ChatColor.getByChar(Character.toLowerCase(c));
++                if(format != null) {
++                    if(builder.length() > 0) {
+                         TextComponent old = component;
+                         component = new TextComponent( old );
+                         old.setText( builder.toString() );
+@@ -122,21 +71,60 @@ public class TextComponent extends BaseComponent
+                         components.add( old );
+                     }
+ 
+-                    TextComponent old = component;
+-                    component = new TextComponent( old );
+-                    String urlString = message.substring( i, pos );
+-                    component.setText( urlString );
+-                    component.setClickEvent( new ClickEvent( ClickEvent.Action.OPEN_URL,
+-                                                             urlString.startsWith( "http" ) ? urlString : "http://" + urlString ) );
+-                    components.add( component );
+-                    i += pos - i - 1;
+-                    component = old;
+-                    continue;
++                    switch ( format )
++                    {
++                        case BOLD:
++                            component.setBold( true );
++                            break;
++                        case ITALIC:
++                            component.setItalic( true );
++                            break;
++                        case UNDERLINE:
++                            component.setUnderlined( true );
++                            break;
++                        case STRIKETHROUGH:
++                            component.setStrikethrough( true );
++                            break;
++                        case MAGIC:
++                            component.setObfuscated( true );
++                            break;
++                        default:
++                            component = new TextComponent();
++                            component.setColor( format );
++                            break;
++                    }
+                 }
+-            }
++            } else {
++                if(autolink) {
++                    int pos = message.indexOf(' ', i);
++                    if(pos == -1) {
++                        pos = message.length();
++                    }
+ 
+-            builder.append( c );
++                    if(matcher.region(i, pos).find()) { //Web link handling
++                        if(builder.length() > 0) {
++                            TextComponent old = component;
++                            component = new TextComponent(old);
++                            old.setText(builder.toString());
++                            builder = new StringBuilder();
++                            components.add(old);
++                        }
++
++                        final String urlString = message.substring(i, pos);
++                        final TextComponent urlComponent = new TextComponent(component);
++                        urlComponent.setText(urlString);
++                        urlComponent.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,
++                                                                  urlString.startsWith("http") ? urlString : "http://" + urlString));
++                        components.add(urlComponent);
++                        i = pos - 1;
++                        continue;
++                    }
++                }
++
++                builder.append( c );
++            }
+         }
++
+         if ( builder.length() > 0 )
+         {
+             component.setText( builder.toString() );
+diff --git a/chat/src/test/java/net/md_5/bungee/api/chat/TextComponentTest.java b/chat/src/test/java/net/md_5/bungee/api/chat/TextComponentTest.java
+new file mode 100644
+index 00000000..93f93a69
+--- /dev/null
++++ b/chat/src/test/java/net/md_5/bungee/api/chat/TextComponentTest.java
+@@ -0,0 +1,152 @@
++package net.md_5.bungee.api.chat;
++
++import net.md_5.bungee.api.ChatColor;
++import org.junit.Test;
++
++import static org.junit.Assert.assertEquals;
++
++public class TextComponentTest {
++
++    @Test
++    public void fromLegacyNoFormatting() throws Exception {
++        assertEquals(new TextComponent("woot"),
++                     TextComponent.fromLegacyToComponent("woot", false));
++    }
++
++    @Test
++    public void fromLegacyWithFormatting() throws Exception {
++        TextComponent c = new TextComponent("woot");
++        c.setColor(ChatColor.GREEN);
++        c.setBold(true);
++
++        assertEquals(c, TextComponent.fromLegacyToComponent(ChatColor.GREEN.toString() + ChatColor.BOLD + "woot", false));
++    }
++
++    @Test
++    public void fromLegacyPartialColor() throws Exception {
++        TextComponent one = new TextComponent("One");
++        TextComponent two = new TextComponent("Two"); two.setColor(ChatColor.GREEN);
++        TextComponent c = new TextComponent(one, two);
++
++        assertEquals(c, TextComponent.fromLegacyToComponent("One" + ChatColor.GREEN + "Two", false));
++    }
++
++    @Test
++    public void fromLegacyAutoLinkStandalone() throws Exception {
++        TextComponent c = new TextComponent("https://oc.tc");
++        c.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://oc.tc"));
++
++        assertEquals(c, TextComponent.fromLegacyToComponent("https://oc.tc", true));
++    }
++
++    @Test
++    public void fromLegacyAutoLinkInline() throws Exception {
++        TextComponent one = new TextComponent("Go to ");
++        TextComponent two = new TextComponent("https://oc.tc"); two.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://oc.tc"));
++        TextComponent three = new TextComponent(" for a good time");
++        TextComponent c = new TextComponent(one, two, three);
++
++        assertEquals(c, TextComponent.fromLegacyToComponent("Go to https://oc.tc for a good time", true));
++    }
++
++    @Test
++    public void toLegacyNoFormatting() throws Exception {
++        assertEquals("woot", new TextComponent("woot").toLegacyText());
++    }
++
++    @Test
++    public void toLegacyWithFormatting() throws Exception {
++        TextComponent c = new TextComponent("woot");
++        c.setColor(ChatColor.GREEN);
++        c.setBold(true);
++
++        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "woot",
++                     c.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyPartialColorNoDefault() throws Exception {
++        TextComponent one = new TextComponent("One");
++        TextComponent two = new TextComponent("Two"); two.setColor(ChatColor.GREEN);
++        TextComponent three = new TextComponent("Three");
++        one.addExtra(two);
++        one.addExtra(three);
++
++        assertEquals("One" + ChatColor.GREEN + "Two" + ChatColor.RESET + "Three",
++                     one.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyPartialColorWithDefault() throws Exception {
++        TextComponent one = new TextComponent("One");
++        TextComponent two = new TextComponent("Two"); two.setColor(ChatColor.GREEN);
++        TextComponent three = new TextComponent("Three");
++        one.addExtra(two);
++        one.addExtra(three);
++
++        assertEquals(ChatColor.RED + "One" + ChatColor.GREEN + "Two" + ChatColor.RED + "Three",
++                     one.toLegacyText(ChatColor.RED));
++    }
++
++    @Test
++    public void toLegacyAddDecoration() throws Exception {
++        TextComponent one = new TextComponent("One"); one.setColor(ChatColor.RED);
++        TextComponent two = new TextComponent("Two"); two.setBold(true);
++        one.addExtra(two);
++
++        assertEquals(ChatColor.RED + "One" + ChatColor.BOLD + "Two",
++                     one.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyRemoveDecoration() throws Exception {
++        TextComponent one = new TextComponent("One"); one.setColor(ChatColor.RED);
++        TextComponent two = new TextComponent("Two"); two.setBold(true);
++        TextComponent three = new TextComponent("Three");
++        one.addExtra(two);
++        one.addExtra(three);
++
++        assertEquals(ChatColor.RED + "One" + ChatColor.BOLD + "Two" + ChatColor.RED + "Three",
++                     one.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyNestedDecoration() throws Exception {
++        TextComponent one = new TextComponent("One"); one.setColor(ChatColor.RED);
++        TextComponent two = new TextComponent("Two"); two.setBold(true);
++        TextComponent three = new TextComponent("Three"); three.setItalic(true);
++        one.addExtra(two);
++        two.addExtra(three);
++        two.addExtra(new TextComponent("Two"));
++        one.addExtra(new TextComponent("One"));
++
++        assertEquals(ChatColor.RED + "One" + ChatColor.BOLD + "Two" + ChatColor.ITALIC + "Three" + ChatColor.RED + ChatColor.BOLD + "Two" + ChatColor.RED + "One",
++                     one.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyCollapseFormatting() throws Exception {
++        TextComponent one = new TextComponent(""); one.setColor(ChatColor.RED);
++        TextComponent two = new TextComponent(""); two.setColor(ChatColor.GREEN);
++        TextComponent three = new TextComponent("Hi"); three.setColor(ChatColor.BLUE);
++        TextComponent four = new TextComponent(""); four.setColor(ChatColor.YELLOW);
++        TextComponent five = new TextComponent("There"); five.setColor(ChatColor.BLUE);
++        one.addExtra(two);
++        one.addExtra(three);
++        one.addExtra(four);
++        one.addExtra(five);
++
++        assertEquals(ChatColor.BLUE + "HiThere",
++                     one.toLegacyText());
++    }
++
++    @Test
++    public void toLegacyWithClickEvent() throws Exception {
++        TextComponent one = new TextComponent("Go to ");
++        TextComponent two = new TextComponent("https://oc.tc"); two.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://oc.tc"));
++        TextComponent three = new TextComponent(" for a good time");
++        TextComponent c = new TextComponent(one, two, three);
++
++        assertEquals("Go to https://oc.tc for a good time", c.toLegacyText());
++    }
++}
+diff --git a/chat/src/test/java/net/md_5/bungee/api/chat/TranslatableComponentTest.java b/chat/src/test/java/net/md_5/bungee/api/chat/TranslatableComponentTest.java
+index c637af56..0cfbb134 100644
+--- a/chat/src/test/java/net/md_5/bungee/api/chat/TranslatableComponentTest.java
++++ b/chat/src/test/java/net/md_5/bungee/api/chat/TranslatableComponentTest.java
+@@ -11,6 +11,6 @@ public class TranslatableComponentTest
+     {
+         TranslatableComponent testComponent = new TranslatableComponent( "Test string with %s placeholders: %s", "2", "aoeu" );
+         assertEquals( "Test string with 2 placeholders: aoeu", testComponent.toPlainText() );
+-        assertEquals( "§fTest string with 2 placeholders: aoeu", testComponent.toLegacyText() );
++        assertEquals( "Test string with 2 placeholders: aoeu", testComponent.toLegacyText() );
+     }
+ }
+diff --git a/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java b/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
+index d7a4f62a..1d845b8e 100644
+--- a/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
++++ b/proxy/src/test/java/net/md_5/bungee/chat/ComponentsTest.java
+@@ -1,6 +1,7 @@
+ package net.md_5.bungee.chat;
+ 
+ import com.google.common.collect.ImmutableList;
++import com.google.common.collect.ImmutableSet;
+ import net.md_5.bungee.api.ChatColor;
+ import net.md_5.bungee.api.chat.BaseComponent;
+ import net.md_5.bungee.api.chat.ClickEvent;
+@@ -53,8 +54,8 @@ public class ComponentsTest
+ 
+         Assert.assertEquals( "Text http://spigotmc.org google.com/test", BaseComponent.toPlainText( test2 ) );
+         //The extra ChatColor.WHITEs are sometimes inserted when not needed but it doesn't change the result
+-        Assert.assertEquals( ChatColor.WHITE + "Text " + ChatColor.WHITE + "http://spigotmc.org" + ChatColor.WHITE
+-                + " " + ChatColor.GREEN + "google.com/test", BaseComponent.toLegacyText( test2 ) );
++        Assert.assertEquals( ChatColor.WHITE + "Text " + ChatColor.WHITE + "http://spigotmc.org" + ChatColor.WHITE + " " + ChatColor.GREEN + "google.com/test",
++                             BaseComponent.toLegacyText( ChatColor.WHITE, ImmutableSet.<ChatColor>of(), test2 ) );
+ 
+         ClickEvent url1 = test2[1].getClickEvent();
+         Assert.assertNotNull( url1 );
+@@ -79,12 +80,12 @@ public class ComponentsTest
+         Assert.assertEquals( "Given Golden Sword * 5 to thinkofdeath", translatableComponent.toPlainText() );
+         Assert.assertEquals( ChatColor.WHITE + "Given " + ChatColor.AQUA + "Golden Sword" + ChatColor.WHITE
+                 + " * 5 to thinkofdeath",
+-                translatableComponent.toLegacyText() );
++                translatableComponent.toLegacyText(ChatColor.WHITE) );
+ 
+         TranslatableComponent positional = new TranslatableComponent( "book.pageIndicator", "5", "50" );
+ 
+         Assert.assertEquals( "Page 5 of 50", positional.toPlainText() );
+-        Assert.assertEquals( ChatColor.WHITE + "Page 5 of 50", positional.toLegacyText() );
++        Assert.assertEquals( ChatColor.WHITE + "Page 5 of 50", positional.toLegacyText(ChatColor.WHITE) );
+     }
+ 
+     @Test
+-- 
+2.11.0 (Apple Git-81)
+

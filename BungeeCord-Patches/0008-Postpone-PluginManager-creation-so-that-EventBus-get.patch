@@ -1,0 +1,60 @@
+From c9e41890c0f6ff98dd8c12a81e5eabd25d797b21 Mon Sep 17 00:00:00 2001
+From: Jedediah Smith <jedediah@silencegreys.com>
+Date: Thu, 27 Nov 2014 17:40:43 -0500
+Subject: [PATCH] Postpone PluginManager creation so that EventBus gets the
+ right logger
+
+
+diff --git a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+index 1c35ec58..3674f95f 100644
+--- a/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
++++ b/proxy/src/main/java/net/md_5/bungee/BungeeCord.java
+@@ -131,7 +131,7 @@ public class BungeeCord extends ProxyServer
+      * Plugin manager.
+      */
+     @Getter
+-    public final PluginManager pluginManager = new PluginManager( this );
++    public final PluginManager pluginManager;
+     @Getter
+     @Setter
+     private ReconnectHandler reconnectHandler;
+@@ -165,18 +165,6 @@ public class BungeeCord extends ProxyServer
+     private ConnectionThrottle connectionThrottle;
+     private final ModuleManager moduleManager = new ModuleManager();
+ 
+-    
+-    {
+-        // TODO: Proper fallback when we interface the manager
+-        getPluginManager().registerCommand( null, new CommandReload() );
+-        getPluginManager().registerCommand( null, new CommandEnd() );
+-        getPluginManager().registerCommand( null, new CommandIP() );
+-        getPluginManager().registerCommand( null, new CommandBungee() );
+-        getPluginManager().registerCommand( null, new CommandPerms() );
+-
+-        registerChannel( "BungeeCord" );
+-    }
+-
+     public static BungeeCord getInstance()
+     {
+         return (BungeeCord) ProxyServer.getInstance();
+@@ -244,6 +232,17 @@ public class BungeeCord extends ProxyServer
+                 logger.info( "Using standard Java compressor." );
+             }
+         }
++
++        pluginManager = new PluginManager( this );
++
++        // TODO: Proper fallback when we interface the manager
++        getPluginManager().registerCommand( null, new CommandReload() );
++        getPluginManager().registerCommand( null, new CommandEnd() );
++        getPluginManager().registerCommand( null, new CommandIP() );
++        getPluginManager().registerCommand( null, new CommandBungee() );
++        getPluginManager().registerCommand( null, new CommandPerms() );
++
++        registerChannel( "BungeeCord" );
+     }
+ 
+     /**
+-- 
+2.11.0 (Apple Git-81)
+
