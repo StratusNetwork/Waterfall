@@ -1,4 +1,4 @@
-From 82c9f8514a18c85c71369db470b011a4a8389b1b Mon Sep 17 00:00:00 2001
+From b5bb9d2c69cc849a2b3059cd1dfc0cfe051df8a5 Mon Sep 17 00:00:00 2001
 From: mrapple <tony@oc.tc>
 Date: Sat, 6 Sep 2014 19:38:31 -0500
 Subject: [PATCH] Change groupId to tc.oc and add our deployment info
@@ -168,7 +168,7 @@ index 6132e8e9..250b777d 100644
      <version>1.12-SNAPSHOT</version>
      <packaging>jar</packaging>
 diff --git a/log/pom.xml b/log/pom.xml
-index 2fcbbad6..e008b1ec 100644
+index 2fcbbad6..2178e243 100644
 --- a/log/pom.xml
 +++ b/log/pom.xml
 @@ -4,13 +4,13 @@
@@ -187,7 +187,7 @@ index 2fcbbad6..e008b1ec 100644
      <artifactId>bungeecord-log</artifactId>
      <version>1.12-SNAPSHOT</version>
      <packaging>jar</packaging>
-@@ -26,10 +26,20 @@
+@@ -26,10 +26,15 @@
              <scope>compile</scope>
          </dependency>
          <dependency>
@@ -199,13 +199,8 @@ index 2fcbbad6..e008b1ec 100644
          </dependency>
 +        <dependency>
 +            <groupId>tc.oc</groupId>
-+            <artifactId>api-minecraft</artifactId>
-+            <version>1.12-SNAPSHOT</version>
-+        </dependency>
-+        <dependency>
-+            <groupId>tc.oc</groupId>
-+            <artifactId>api-minecraft</artifactId>
-+            <version>1.12-SNAPSHOT</version>
++            <artifactId>raven-bungee</artifactId>
++            <version>1.11-SNAPSHOT</version>
 +        </dependency>
      </dependencies>
  </project>
