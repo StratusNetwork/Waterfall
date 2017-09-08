@@ -1,4 +1,4 @@
-From 280387090603fbda2c7ccb78e1fe9203baf9f6a7 Mon Sep 17 00:00:00 2001
+From 218dd5f7ccc6d49f1e4daa57fb792e50d88852df Mon Sep 17 00:00:00 2001
 From: Troy Frew <fuzzy_bot@arenaga.me>
 Date: Tue, 15 Nov 2016 10:31:04 -0500
 Subject: [PATCH] 1.7.x Protocol Patch
@@ -159,7 +159,7 @@ index 491cf1a1..299a216c 100644
      }
  }
 diff --git a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
-index 111ee8b4..d5e038ef 100644
+index 6c31f15f..fdfd1cdc 100644
 --- a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
 +++ b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
 @@ -3,6 +3,7 @@ package net.md_5.bungee;
@@ -178,7 +178,7 @@ index 111ee8b4..d5e038ef 100644
  import net.md_5.bungee.protocol.packet.EncryptionRequest;
  import net.md_5.bungee.protocol.packet.Handshake;
  import net.md_5.bungee.protocol.packet.Kick;
-@@ -197,10 +199,20 @@ public class ServerConnector extends PacketHandler
+@@ -198,10 +200,20 @@ public class ServerConnector extends PacketHandler
  
              user.unsafe().sendPacket( modLogin );
  
@@ -203,7 +203,7 @@ index 111ee8b4..d5e038ef 100644
  
              user.setDimension( login.getDimension() );
          } else
-@@ -342,6 +354,14 @@ public class ServerConnector extends PacketHandler
+@@ -343,6 +355,14 @@ public class ServerConnector extends PacketHandler
          {
              this.handshakeHandler.handle( pluginMessage );
  

@@ -1,4 +1,4 @@
-From 662a7fdb550ad167c137aadcd4b17adc061dc189 Mon Sep 17 00:00:00 2001
+From 4e4d05de1a049331e841ffadc9ad309abc1608a4 Mon Sep 17 00:00:00 2001
 From: Jedediah Smith <jedediah@silencegreys.com>
 Date: Tue, 6 Jan 2015 11:24:09 -0500
 Subject: [PATCH] Add the capability to simulate username changes
@@ -17,18 +17,10 @@ index 17cfccd0..51824022 100644
      public ServerConnectEvent(ProxiedPlayer player, ServerInfo target)
      {
 diff --git a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
-index d5e038ef..eb9fd3e3 100644
+index fdfd1cdc..8fca0a40 100644
 --- a/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
 +++ b/proxy/src/main/java/net/md_5/bungee/ServerConnector.java
-@@ -36,6 +36,7 @@ import net.md_5.bungee.protocol.packet.EncryptionRequest;
- import net.md_5.bungee.protocol.packet.Handshake;
- import net.md_5.bungee.protocol.packet.Kick;
- import net.md_5.bungee.protocol.packet.Login;
-+import net.md_5.bungee.protocol.packet.LoginRequest;
- import net.md_5.bungee.protocol.packet.LoginSuccess;
- import net.md_5.bungee.protocol.packet.PluginMessage;
- import net.md_5.bungee.protocol.packet.Respawn;
-@@ -52,6 +53,7 @@ public class ServerConnector extends PacketHandler
+@@ -53,6 +53,7 @@ public class ServerConnector extends PacketHandler
      private final UserConnection user;
      private final BungeeServerInfo target;
      private State thisState = State.LOGIN_SUCCESS;
@@ -36,12 +28,12 @@ index d5e038ef..eb9fd3e3 100644
      @Getter
      private ForgeServerHandler handshakeHandler;
      private boolean obsolete;
-@@ -109,7 +111,7 @@ public class ServerConnector extends PacketHandler
+@@ -110,7 +111,7 @@ public class ServerConnector extends PacketHandler
          channel.write( copiedHandshake );
  
          channel.setProtocol( Protocol.LOGIN );
--        channel.write( user.getPendingConnection().getLoginRequest() );
-+        channel.write(new LoginRequest(fakeUsername != null ? fakeUsername : user.getPendingConnection().getName()));
+-        channel.write( new LoginRequest( user.getName() ) );
++        channel.write(new LoginRequest(fakeUsername != null ? fakeUsername : user.getName()));
      }
  
      @Override
